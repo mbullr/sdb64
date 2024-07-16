@@ -1,4 +1,4 @@
-# ScarletDME Makefile
+# SD Makefile with python and sodium
 #
 #   You are allowed to modify this file, so long as the derived file can
 #   be distributed under the same license as this file.  You are allowed to copy
@@ -31,9 +31,15 @@ GPLBIN   := $(MAIN)bin/
 TERMINFO := $(MAIN)terminfo/
 VPATH    := $(GPLOBJ):$(GPLBIN):$(GPLSRC)
 
+# mab python and sodium include
+PYHDRS   := /usr/include/python3.12
+SODIUM   := /usr/include/sodium
+LIBSODIUM := /usr/lib/x86_64-linux-gnu/
+
+
 COMP     := gcc
 
-L_FLAGS    := -Wl,--no-as-needed -lm -lcrypt -ldl -lbsd
+L_FLAGS    := -Wl,--no-as-needed -lm -lcrypt -ldl -lbsd -lpython3.12 -L$(LIBSODIUM) -lsodium
 SONAME_OPT := -soname
 
 RM       := rm
@@ -50,7 +56,7 @@ DIROBJS  := $(addprefix $(GPLOBJ),$(OBJS))
 	
 sd: ARCH :=
 sd: BITSIZE := 64
-sd: C_FLAGS  := -Wall -Wformat=2 -Wno-format-nonliteral -DLINUX -D_FILE_OFFSET_BITS=64 -I$(GPLSRC) -DGPL -g $(ARCH) -fPIE
+sd: C_FLAGS  := -Wall -Wformat=2 -Wno-format-nonliteral -DLINUX -D_FILE_OFFSET_BITS=64 -I$(GPLSRC) -I$(PYHDRS) -DGPL -g $(ARCH) -fPIE
 sd: $(SDOBJS) sdclilib.so sdtic sdfix sdconv sdidx sdlnxd terminfo
 	@echo Linking $@
 	@cd $(GPLOBJ)

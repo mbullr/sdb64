@@ -55,6 +55,7 @@ op_logic
 op_misc
 op_mvfun
 op_oconv
+op_sdme_ext
 op_seqio
 op_sh
 op_skt

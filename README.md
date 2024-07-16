@@ -1,3 +1,41 @@
+SD Extension - branch of SD
+
+The purpose of this branch is to define a generic function for extending SD / BASIC to interface with C code.
+
+Why do this?
+
+Currently SD has 16 unassigned op codes for use by GPL developers, 
+as development advances, it is highly probable that the project will run out of "free" available op codes.
+
+    Function SDME.EXT:
+
+    Function SDME.EXT(Arg, IsArgMV, Function_id)
+    where
+      Function_Id = the integer value used to identify what c code / function is execute.
+      IsArgMV     = If passing a multiple arguments in Arg, set to true, otherwise false.  
+      Arg         = string value passed to the c code / function. For functions requiring multiple arguments, set IsArgMV to true and pass arguments in a FIELD_MARK separated string, with a maximum of ?10? fields??
+
+    Note: Use the BASIC function STATUS() to return function status:
+	
+	STATUS() = 0 successful call, or  STATUS() = 1 unsuccessful call
+ 
+    Function SDME.EXT is patterned off the code for OSPATH / op_ospath found in gplsrc/op_dio2.c
+
+Step by step process to follow for adding new op codes to SD found in SD_ScarletDME-notes/AddingOpcodes.rst
+
+Also see:
+
+Call the python interpreter from SD using the python API: SD_ScarletDME-notes/PythonInSD.rst
+
+Encryption via Libsodium: SD_ScarletDME-notes/Encryption.rst
+
+
+this is a work in progress.......     
+  
+------- 
+
+
+
 SD, the Multivalue String Database
 
 SD is a multivalue database in the Pr1me Information tradition.  It contains open source code

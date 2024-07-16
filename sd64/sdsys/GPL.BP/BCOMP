@@ -19,6 +19,7 @@
 * 
 * START-HISTORY:
 * 19 Jan 04  0.6.1 SD launch. Earlier history details suppressed.
+* 15 Jul 24  mab add sdme.ext sd c extension function call
 * END-HISTORY
 *
 *
@@ -622,6 +623,8 @@ $define STACK.MARK 9999         ;* Marks start of sub-expression
    int.intrinsics<-1> = "READPKT"         ; int.intrinsic.opcodes<-1> = OP.READPKT
    int.intrinsics<-1> = "REMOVEF"         ; int.intrinsic.opcodes<-1> = OP.RMVF
    int.intrinsics<-1> = "SCAN"            ; int.intrinsic.opcodes<-1> = OP.BTSCAN
+   * 20240715 mab add SDME.EXT function
+   int.intrinsics<-1> = "SDME.EXT"        ; int.intrinsic.opcodes<-1> = OP.SDMEEXT
    int.intrinsics<-1> = "SORTDATA"        ; int.intrinsic.opcodes<-1> = OP.SORTDATA
    int.intrinsics<-1> = "SORTNEXT"        ; int.intrinsic.opcodes<-1> = OP.SORTNEXT
    int.intrinsics<-1> = "TESTLOCK"        ; int.intrinsic.opcodes<-1> = OP.TESTLOCK
@@ -3778,6 +3781,8 @@ end
                                in.none,       ;* READPKT
                                in.removef,    ;* REMOVEF
                                in.scan,       ;* SCAN
+                               * 20240715 mab add SDME.EXT function
+                               in.three,      ;* SDME.EXT 
                                in.none,       ;* SORTDATA
                                in.sortnext,   ;* SORTNEXT
                                in.one         ;* TESTLOCK

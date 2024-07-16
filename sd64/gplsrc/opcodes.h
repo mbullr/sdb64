@@ -18,6 +18,7 @@
  * 
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed 
+ * 15 Jul 24 mab add SDME.EXT
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -608,8 +609,7 @@ _opc_(0xCFFB, OP_CFFB,     "OPCFFB",     op_illegal2,  OPCODE_BYTE,         0)
 _opc_(0xCFFC, OP_CFFC,     "OPCFFC",     op_illegal2,  OPCODE_BYTE,         0)
 _opc_(0xCFFD, OP_CFFD,     "OPCFFD",     op_illegal2,  OPCODE_BYTE,         0)
 _opc_(0xCFFE, OP_CFFE,     "OPCFFE",     op_illegal2,  OPCODE_BYTE,         0)
-_opc_(0xCFFF, OP_CFFF,     "OPCFFF",     op_illegal2,  OPCODE_BYTE,         0)
-
+_opc_(0xCFFF, OP_SDMEEXT,  "SDMEEXT",    op_sdme_ext,  OPCODE_BYTE,        -2)
 /* Secondary opcodes with private dispatch systems
         Prefix     Base opcode   Opcode             */
 _extop_("MVD",     "ABS",        "ABSS")
