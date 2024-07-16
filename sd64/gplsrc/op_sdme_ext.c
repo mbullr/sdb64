@@ -38,11 +38,12 @@
 
 extern void sdme_py(int key, char* Arg);
 extern void sdme_crypt(int key, char* Arg0, char* Arg1); 
+extern int   Dcount(char* src, char* delim_str);                   /* Dcount from ctype.c */
+extern char* Extract(char* src, int fno, int vno, int svno);       /* Extract from ctype.c */
 
 char *    SDMEArgArray[SDMEE_Max_Args];          /* create an array of pointers, for string arguments (for SDME.EXT call ) not sure if this is correct */
 
-int   Dcount(char* src, char* delim_str);                   /* Dcount from qmclilib */
-char* Extract(char* src, int fno, int vno, int svno);       /* Extract from qmclilib */
+
 char* NullString(void); 
 
 
@@ -229,110 +230,6 @@ void op_sdme_ext() {
   
   return;
 }
-
-/* ======================================================================
-   Dcount()  -  Count fields, values or subvalues                       
-   copied from qmclilib.c                                              */
-
-int Dcount(char* src, char* delim_str) {
-  int32_t src_len;
-  char* p;
-  int32_t ct = 0;
-  char delim;
-
-  if (strlen(delim_str) != 0) {
-    delim = *delim_str;
-
-    src_len = strlen(src);
-    if (src_len != 0) {
-      ct = 1;
-      while ((p = memchr(src, delim, src_len)) != NULL) {
-        src_len -= (1 + p - src);
-        src = p + 1;
-        ct++;
-      }
-    }
-  }
-
-  return ct;
-}
-
-/* ======================================================================
-   Extract()  -  Extract field, value or subvalue                      
-   copied from qmclilib.c                                              */
-
-char* Extract(char* src, int fno, int vno, int svno) {
-  int32_t src_len;
-  char* p;
-  char* result;
-
-  src_len = strlen(src);
-  if (src_len == 0)
-    goto null_result; /* Extracting from null string */
-
-  /* Setp 1  -  Initialise variables */
-
-  if (fno < 1)
-    fno = 1;
-
-  /* Step 2  -  Position to start of item */
-
-  /* Skip to start field */
-
-  while (--fno) {
-    p = memchr(src, FIELD_MARK, src_len);
-    if (p == NULL)
-      goto null_result; /* No such field */
-    src_len -= (1 + p - src);
-    src = p + 1;
-  }
-  p = memchr(src, FIELD_MARK, src_len);
-  if (p != NULL)
-    src_len = p - src; /* Adjust to ignore later fields */
-
-  if (vno < 1)
-    goto done; /* Extracting whole field */
-
-  /* Skip to start value */
-
-  while (--vno) {
-    p = memchr(src, VALUE_MARK, src_len);
-    if (p == NULL)
-      goto null_result; /* No such value */
-    src_len -= (1 + p - src);
-    src = p + 1;
-  }
-
-  p = memchr(src, VALUE_MARK, src_len);
-  if (p != NULL)
-    src_len = p - src; /* Adjust to ignore later values */
-
-  if (svno < 1)
-    goto done; /* Extracting whole value */
-
-  /* Skip to start subvalue */
-
-  while (--svno) {
-    p = memchr(src, SUBVALUE_MARK, src_len);
-    if (p == NULL)
-      goto null_result; /* No such subvalue */
-    src_len -= (1 + p - src);
-    src = p + 1;
-  }
-  p = memchr(src, SUBVALUE_MARK, src_len);
-  if (p != NULL)
-    src_len = p - src; /* Adjust to ignore later fields */
-
-done:
-  result = malloc(src_len + 1);
-  memcpy(result, src, src_len);
-  result[src_len] = '\0';
-  return result;
-
-null_result:
-  return NullString();
-}
-
 
 char* NullString() {
   char* p;

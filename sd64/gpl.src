@@ -70,6 +70,8 @@ op_sys
 op_tio
 pdump
 reccache
+sdme_encrypt_sodium
+sdme_py
 sdlib
 sdsem
 sdtermlb
