@@ -1,0 +1,7 @@
+subroutine PY_RUNSTRING(py_script,rtnstat)
+* run the python script in py_script in the interperter
+$internal
+$catalog !PY_RUNSTRING
+$include SDME.EXT.H
+rtnstat = SDME.EXT(py_script,@FALSE,SDMEE_PyRunStr)
+end

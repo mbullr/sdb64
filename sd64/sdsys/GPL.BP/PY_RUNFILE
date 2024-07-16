@@ -1,0 +1,9 @@
+subroutine PY_RUNFILE(py_script_file,rtnstat)
+* run the python script from file py_script_file in the interperter
+* note full file path limited by linux/limits.h PATH_MAX (4096)
+* use of k_get_c_string()  -  Extract string to C string - prevents buffer overflow
+$internal
+$catalog !PY_RUNFILE
+$include SDME.EXT.H
+rtnstat = SDME.EXT(py_script_file,@FALSE,SDMEE_PyRunFile)
+end

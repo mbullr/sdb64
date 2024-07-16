@@ -1,0 +1,67 @@
+PROGRAM SDME_ENCRYPT
+$internal
+$EXPLIST
+
+$include GPL.BP SDME.EXT.H
+
+$define key_sz   32 ;* size in bytes of libsodium key
+$define tag_sz   16 ;* size in bytes of libsodium tag
+$define nonce_sz 24 ;* size in bytes of libsodium nonce
+ 
+PRINT "Testing sdme.ext: Encrypt / Decrypt "
+
+pltext = 'My plain text message'
+
+PRINT 'Our Text: ':pltext
+
+* define a key in hex format
+* rem key lenght is 32 bytes or 64 Hex characters
+* NOT the way to do this, but its a test
+mykey  = '0102030405060708'
+mykey := '2FEFEFEFEFEFEFEF'
+mykey := '3023456789ABCDEF'
+mykey := '4102030405060708'
+
+
+PRINT '==============================================='
+PRINT ' Encrypt Test'
+PRINT '==============================================='
+
+IsArgMV = @TRUE
+Rtnval = ''
+*
+Arg = mykey:@FM:pltext
+*
+RtnVal = SDME.EXT(Arg,IsArgMV,SDMEE_EncryptHX)
+STAT = STATUS()
+*
+PRINT 'Status: ':STAT
+*
+print 'Size of Return Value: ' : len(RtnVal)
+PRINT 'Return encode: ' : len(pltext)*2
+PRINT RtnVal[1,len(pltext)*2]
+PRINT
+PRINT 'TAG: ' : tag_sz*2
+PRINT RtnVal[len(pltext)*2+1,tag_sz*2]
+PRINT
+PRINT 'NONCE: ': nonce_sz*2
+PRINT RTNVAL[(len(pltext)*2+(tag_sz*2))+1, nonce_sz*2] 
+
+PRINT '==============================================='
+PRINT ' Decrypt Test'
+PRINT '==============================================='
+Arg = mykey:@FM:RTNVAL
+*
+RtnVal = SDME.EXT(Arg,IsArgMV,SDMEE_DecryptHX)
+STAT = STATUS()
+*
+PRINT 'Status: ':STAT
+PRINT 'Decrypted Text: ':RtnVal
+*
+If RtnVal = pltext then
+  Print 'Success!'
+END ELSE
+  PRINT 'Oops, Back to the drawing board!'
+END
+
+END

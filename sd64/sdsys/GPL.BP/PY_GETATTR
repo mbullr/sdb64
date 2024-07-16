@@ -1,0 +1,16 @@
+subroutine PY_GETATTR(py_attr,rtn_string,error)
+* Return the (string) value of the  python attribute passed in py_attr
+$internal
+$catalog !PY_GETATTR
+$include SDME.EXT.H
+rtn_string = SDME.EXT(py_attr,@FALSE,SDMEE_PyGetAtt)
+err_str_preamble = len(SDMEE_PyEr_String)
+error = @FALSE
+* look for the error preamble in the returned string, set error if found
+if rtn_string[1,err_str_preamble] = SDMEE_PyEr_String then
+  error = @TRUE
+  err_str_len = len(rtn_string)
+  rtn_string = rtn_string[err_str_preamble+1,err_str_len]
+end
+
+end

@@ -1,0 +1,72 @@
+program py_test
+print 'embedded python test, hit <enter> to start':
+input ok
+print str('=',50)
+*
+print 'attempt init'
+call !PY_INITIALIZE(rtn)
+print 'status = ':rtn
+print str('=',50)
+*
+print 'script text:'
+lf = char(10)
+ script  = 'FMRK   = chr(254)':lf
+ script := 'VMRKM  = chr(253)':lf
+ script := 'SVMRK  = chr(252)':lf
+ script := 'result = ""':lf
+ script := 'countdown = {"3" : "Three", "2" : "Two", "1" : "One", "0" : "Ignition!"}':lf
+ script := 'for count in countdown:':lf
+ script := '  result += count + " " + countdown[count] + FMRK ':lf
+ script := "result = bytes(result, 'latin')":lf
+ *
+* print script
+script_len = len(script)
+for i = 1 to script_len
+ch = script[i,1]
+  if ch = lf then
+    print
+  end else
+    print ch:
+  end
+next i
+print str('=',50)
+*
+print 'attempt to run script:'
+call !PY_RUNSTRING(script,rtn)
+print 'status = ':rtn
+if rtn <> 0 then goto 999
+print str('=',50)
+*
+print 'attempt to access python object: result'
+call !PY_GETATTR("result",rtn_string,error)
+print "result:"
+print rtn_string
+fldcnt = dcount(rtn_string,@FM)
+for i = 1 to fldcnt
+  print rtn_string<i>
+next i
+*
+print 'status = ':error
+
+print str('=',50)
+print 'attempt to access python object: countdown'
+call !PY_GETATTR("countdown",rtn_string,error)
+print "countdown:"
+print rtn_string
+*
+print 'status = ':error
+
+print str('=',50)
+print 'attempt to access nonexistent python object: dummy'
+call !PY_GETATTR("dummy",rtn_string,error)
+print "dummy:"
+print rtn_string
+*
+print 'status = ':error
+
+print str('=',50)
+*
+999: print 'attempt finalize'
+call !PY_FINALIZE(rtn)
+print 'status =':rtn
+end

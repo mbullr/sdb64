@@ -1,0 +1,11 @@
+subroutine PY_FINALIZE(rtnstat)
+* finalize the python interpreter
+$internal
+$catalog !PY_FINALIZE
+$include SDME.EXT.H
+rtnstat = SDME.EXT('',@FALSE,SDMEE_PyFinal)
+if rtnstat < 0 then
+* Py_FinalizeEx reported there were errors during finalization (flushing buffered data), not sure what we do about it!
+  rtnstat = SDMEE_PyEr_FinalEr    ;* but we will let the caller know
+end
+end

@@ -1,0 +1,7 @@
+subroutine PY_INITIALIZE(rtnstat)
+* initialized the python interpreter
+$internal
+$catalog !PY_INITIALIZE
+$include SDME.EXT.H
+rtnstat = SDME.EXT('',@FALSE,SDMEE_PyInit)
+end
