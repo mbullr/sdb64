@@ -18,8 +18,9 @@
  * 
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
- * 15 Jun 24 add bootstrap build option install option -I
- * 02 Jul 24 -i  typeo will hit bootstrap option
+ * 15 Jun 24 mab add bootstrap build option install option -I
+ * 02 Jul 24 mab -i  typeo will hit bootstrap option
+ * 19 Jul 24 mab add python finialize test 
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -86,10 +87,14 @@
 #include "config.h"
 #include "options.h"
 #include "locks.h"
+#include "SDME_EXT.h"
 
 #define BUILD_TARGET "64 Bit"
 
 extern char *x_option; /* -x option */
+
+/* 20240719 mab finalize python at shutdown */
+extern void sdme_py(int key, char* Arg);
 
 bool bind_sysseg(bool create, char *errmsg);
 void unbind_sysseg(void);
@@ -116,6 +121,7 @@ int main(int argc, char *argv[]) {
 
   int status = 1;
   char errmsg[80 + 1];
+  char shutdown[] = "shutdown";
 
   tio.term_type[0] = '\0';
 
@@ -237,6 +243,8 @@ int main(int argc, char *argv[]) {
   //   dh_shutdown();
   //   unbind_sysseg();
   //   shut_console();
+  /* 20240719 mab finalize python at shutdown */
+  sdme_py(SDMEE_PyFinal, shutdown);   /* if python was used, shut it down */
   clean_stop();
   return status;
 }

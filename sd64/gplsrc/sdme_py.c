@@ -1,10 +1,16 @@
 /* SDME_PY.C
- * python integration for ScarletDME via SDME.EXT (op_sdme_ext.c) BASIC function
+ * python integration for SD via SDME.EXT (op_sdme_ext.c) BASIC function
  *
  * to do- add STATUS() = 0 successful call, or  STATUS() = 1 unsuccessful call
  * 
  * START-HISTORY:
  * 15 Jul 2024 MAB add SDME_PY.C 
+ * 19 Jul 2024 mab remove Py_DECREF(pdict) at finalize, not necessary (at least samples I have seen dont do it)
+ *   Also note, original idea was initialize - run script - finalize for each use (call from BASIC prog).
+ *   This does not always appear to work, sometimes end up with double free or corruption (out) error on second call to 
+ *   Py_Run_File.  Searching python forums seems to suggest only initialize and finalize once per SD session.
+ *   Code already checks for python already initiailize, but how to handle Finalize?
+ *   Could add test at SD close if Py_IsInitialized() then Py_FinalizeEx() ?? TBD
  * START-DESCRIPTION:
  *
  *
@@ -53,7 +59,7 @@ void sdme_py(int key, char* Arg){
 
   int myResult;
   char    CmdResp[SDMEE_ErrMsg_LEN +1] init("");  /*  buffer for error message  */
-  
+  char shutdown[] = "shutdown";
   
   /*Evaluate KEY */
   
@@ -89,17 +95,26 @@ void sdme_py(int key, char* Arg){
     case SDMEE_PyFinal: /* Finalize the python interpreter   */
                   
       if (Py_IsInitialized()) {  /* only finalize if previously initialized */
-        if (pdict!=NULL){        /* should never be NULL here, but never say never */
-           Py_DECREF(pdict);        /* done with pdict */
-        }
         myResult = Py_FinalizeEx();
       } else {
         myResult = 0; 
       }
- 
+      
+      if (strcmp(Arg, shutdown) != 0){    /* test for shutdown, nothing to return */
+        InitDescr(e_stack, INTEGER);
+        (e_stack++)->data.value = (int32_t)myResult;
+      }
+      break;
+
+    case SDMEE_IsPyInit: /* Is python interpreter initialized?   */
+                  
+      myResult = Py_IsInitialized();
+
       InitDescr(e_stack, INTEGER);
       (e_stack++)->data.value = (int32_t)myResult;
       break;
+
+
 
     case SDMEE_PyRunStr:   /* Take the string in Arg passed from op_sdme_ext (from SDME.EXT Arg value) and run in python interpreter  */
                          

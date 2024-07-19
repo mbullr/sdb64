@@ -40,7 +40,7 @@ sudo date
 echo
 echo Installing required packages
 echo
-sudo apt-get install build-essential micro lynx libbsd-dev python-dev libsodium-dev libsodium23
+sudo apt-get install build-essential micro lynx libbsd-dev python3-dev libsodium-dev libsodium23
  
 cd $cwd/sd64
 

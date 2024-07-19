@@ -1,0 +1,79 @@
+program PY_GUI_TEST
+*
+* program shows how to use FreeSimpleGUI to create a simple gui input screen in sd
+* Notes - You cannot run this from root, you will get:
+*  Authorization required, but no authorization protocol specified 
+* This is because root does not have X windows configuration available (it a security thing)
+*
+* Instead run from your user account!
+*
+*
+* must create the following script file and edit the following to point to it's location
+script_file = "/home/xyz/python_stuff/sdguitest.py"
+**************************************************************************
+*# sdguitest.py
+*import sys
+*sys.path.append('/home/xyz/python_stuff')   <=== directory that contains FreeSimpleGUI.py
+*import FreeSimpleGUI as sg
+*
+*
+*SDME_FM  = chr(254)
+*SDME_VM  = chr(253)
+*SDME_SVM = chr(252)
+*#
+*
+*layout = [ 
+*            [sg.Text('User Name', size=(12)), sg.Input(key='-UNAME-', size=(25))],
+*            [sg.Text('DOB', size=(12)), sg.Input(key='-DOB-', size=(25))],
+*            [ sg.Text('Account', size=(12)), sg.Input(key='-ACCOUNT-', size=(25))],
+*            [sg.Button('Ok')]
+*            ]
+*
+*window = sg.Window('Simple Inputs', layout, element_justification='r')
+*
+*while True:
+*    event, values = window.read()
+*    if event == sg.WIN_CLOSED:
+*        break
+*    elif event == 'Ok':
+*        break
+*# rem  values['-UNAME-'] to access info
+*window.close()
+*
+*****************************************************************************
+print 'embedded python test, hit <enter> to start':
+input ok
+* rem to set script_file = "/home/xyz/python_stuff/sdguitest.py"
+print 'attempt to run script: ' : script_file
+print str('=',50)
+*
+*
+crt ' check to see if python already initialized'
+call !PY_IS_INITIALIZED(rtn)
+if rtn then
+  crt 'already initialized'
+end else
+  crt 'not initialized, attempt init'
+  call !PY_INITIALIZE(rtn)
+  crt 'status = ':rtn
+end
+
+crt str('=',50)
+
+call !PY_RUNFILE(script_file,rtn)
+crt 'status = ':rtn
+if rtn <> 0 then goto 999
+
+crt str('=',50)
+crt 'attempt to access python object: values'
+call !PY_GETATTR("values",rtn_string,error)
+crt "values:"
+crt rtn_string
+crt 'status = ':error
+*
+crt str('=',50)
+*
+999: crt 'complete'
+* note we do not finilize here, test in sd.c and finialze there!
+*call !PY_FINALIZE(rtn)
+end

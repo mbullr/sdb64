@@ -35,7 +35,8 @@ $define SDMEE_Decode64     207  ;* decode Base64
 
 * embedded python 
 $define  SDMEE_PyInit        2000  ;* initialize the python interpreter   
-$define  SDMEE_PyFinal       2001  ;* Finalize the python interpreter   
+$define  SDMEE_PyFinal       2001  ;* Finalize the python interpreter  
+$define  SDMEE_IsPyInit      2002  ;* Is python interpreter initialized 
 $define  SDMEE_PyRunStr      2010  ;* Take the string in qmBasic variable VAL and run in python interpreter   
 $define  SDMEE_PyRunFile     2011  ;* Take the file and path defined in qmBasic variable VAL and run in python interpreter   
 $define  SDMEE_PyGetAtt      2100  ;* Return the (string) value of python attribute defined in qmBasic variable VAL   

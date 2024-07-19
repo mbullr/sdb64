@@ -1,0 +1,7 @@
+subroutine PY_IS_INITIALIZED(rtnstat)
+* check for initialized python interpreter
+$internal
+$catalog !PY_IS_INITIALIZED
+$include SDME.EXT.H
+rtnstat = SDME.EXT('',@FALSE,SDMEE_IsPyInit)
+end

@@ -1,5 +1,5 @@
 subroutine PY_FINALIZE(rtnstat)
-* finalize the python interpreter
+* finalize the python interpreter Note: most likely not needed, will check when sd shutsdown
 $internal
 $catalog !PY_FINALIZE
 $include SDME.EXT.H
