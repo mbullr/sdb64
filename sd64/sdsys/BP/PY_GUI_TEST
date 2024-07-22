@@ -8,7 +8,7 @@ program PY_GUI_TEST
 * Instead run from your user account!
 *
 *
-* must create the following script file and edit the following to point to it's location
+* must create the following somewhere and edit the following to point to location
 script_file = "/home/xyz/python_stuff/sdguitest.py"
 **************************************************************************
 *# sdguitest.py
@@ -60,10 +60,18 @@ end
 
 crt str('=',50)
 
+*
+* run the script saved in file script_file
+*
+crt 'run the script file'
 call !PY_RUNFILE(script_file,rtn)
 crt 'status = ':rtn
 if rtn <> 0 then goto 999
 
+*
+* get the values entered by the user,
+* note: will be returned as a string representation of a python dictionary
+*
 crt str('=',50)
 crt 'attempt to access python object: values'
 call !PY_GETATTR("values",rtn_string,error)

@@ -195,7 +195,8 @@ void op_sdme_ext() {
       break;
   
     case SDMEE_PyInit:  
-    case SDMEE_PyFinal:   
+    case SDMEE_PyFinal:  
+    case SDMEE_IsPyInit: 
     case SDMEE_PyRunStr:  
     case SDMEE_PyRunFile: 
     case SDMEE_PyGetAtt :

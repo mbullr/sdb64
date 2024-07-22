@@ -184,6 +184,7 @@ void sdme_py(int key, char* Arg){
       }
       pval =  PyMapping_GetItemString(pdict, Arg);             /* get my result string */
       if (pval == NULL) {
+        PyErr_Clear();  /* we most likely had a key error, once set Py_Run will not work, clear it*/  
       /* fetch of dictionary value failed for some reason */
         myResult = snprintf(CmdResp, SDMEE_ErrMsg_LEN,SDMEE_PyEr_String " Fetch of dict key %s failed.",  Arg);
         k_put_c_string(CmdResp, e_stack);   /* sets descr as type string and place the python value into it */
