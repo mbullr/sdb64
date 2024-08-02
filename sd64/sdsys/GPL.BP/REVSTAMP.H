@@ -32,7 +32,7 @@ $define MAJOR.REV      2
 $define MINOR.REV      6
 $define BUILD          6
 $define VM.REV.STAMP   "2.6-6"
-$define SD.REV.STAMP   "0.8.dev"
+$define SD.REV.STAMP   "0.7.1"
 
 $define SD.COPYRIGHT.YEAR "2007"
 
