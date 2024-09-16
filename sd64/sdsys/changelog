@@ -2,6 +2,7 @@ SD, the Multivalue String Database
 
 Change Log:
 -----------------------
+
 Version 0.8.1
 -------------
 (mab) Correct c function op_dtx / BASIC function DTX(), using wrong format code.
@@ -9,6 +10,7 @@ Version 0.8.1
       and Key from Password (Phrase) via Libsodium.  See SD Encryption in Documentation folder. 
 (mab) Add embedded python build to examples folder (../examples/python/embedded_python). See  
       SD Embedded Python in Documentation folder.
+
 Version 0.7.1
 -------------
 (mab) Add BASIC Functions / Statements:
