@@ -1,0 +1,1000 @@
+SUBROUTINE SD_QWK_RPT(RPT_DEF_REC, REPORT_FILE_PATH, REPORT_FILE_NAME, REPLACE_STRING, OPTIONS, MY_STATUS)
+**************************************************************************
+* Copyright (c)2024 The SD Developers, All Rights Reserved
+*
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation; either version 3, or (at your option)
+* any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software Foundation,
+* Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+*
+*
+**************************************************************************
+*
+* MODULE: SD_QWK_RPT
+* AUTHOR: MAB
+* VERSION: 1.0.0
+* CREATED: 09/xx/2024
+* UPDATED:
+*
+* MAINTENANCE RECORD:
+*
+* EQUATE:
+*
+* VARIABLES:
+* RPT_DEF_REC             - Report definition record
+* Report_File_Path & Name - File Path and Name of  report file created by this routine)
+* Replace_String          -  String of Valid Name / Value lookup array (dyn) which will be used to replace the Name value found in the report with the associated value.
+*                         - ie) FLD 1 %%CustName%% <vm> %%CustAddrStreet1%% <vm> %%CustAddrStreet2%% <vm> %%City%%  .. and so on
+*                               FLD 2 Joe Blow's Hardware <vm> 101 Avenue <vm> Suite 10 <vm> Plainville
+*                           Where %%CustName%% is found in the report definition, "Joe Blow's Hardware is output.
+*                           
+* Options<1>              - spreadsheet type, choice of: openpyxl supports xlsx/xlsm/xltx/xltm
+*                                                 xlsx - Excel XML spreadsheet
+*
+* Options<2>              - Debug - run SD_QWK_RPT in debug mode
+*
+* Status                  - Returned Status (0) - ok, Report file created (Non Zero - Error)
+*
+*
+*
+* FILES:
+* See Above &
+* ERRLOG in SDSYS account written via LOGMSG command
+*
+*
+* DESIGN DESCRIPTION:
+* SD BASIC SUBROUTINE, PRODUCES SPREADSHEET REPORT USING EMBEDDED PYTHON AND PYTHON MODULE openpyxl
+*
+*******************************************************************************************************************************************
+* Set compiler options and add INCLUDES
+*
+* Note, we make use of OSPATH, which in SD is still an internal function
+* which means the user compiling this program must start sd with the -internal flag
+$INTERNAL 
+* $INCLUDE GPL.BP INT$KEYS.H
+*
+* INT$KEYS.H IN GPL.BP IS NOT AVALIBLE AS AN INCLUDE FOR PROGRAMS NOT FOUND IN GPL.BP
+* FOR NOW WE WILL JUST COPY THE NEEDED DEFINES HERE
+*
+* OSPATH() action keys
+      $define OS$PATHNAME        0       ;* Test if valid filename
+      $define OS$FILENAME        1       ;* Test if valid pathname
+      $define OS$EXISTS          2       ;* Test if file exists
+      $define OS$UNIQUE          3       ;* Make a unique file name
+      $define OS$FULLPATH        4       ;* Return full DOS file name
+      $define OS$DELETE          5       ;* Delete file
+      $define OS$CWD             6       ;* Get current working directory
+      $define OS$DTM             7       ;* Get date/time modified
+      $define OS$FLUSH.CACHE     8       ;* Flush DH file cache
+      $define OS$CD              9       ;* Change working directory
+      $define OS$MAPPED.NAME    10       ;* Map a directory file name
+      #define OS$OPEN           11       ;* Check if file is open by pathanme
+      $define OS$DIR            12       ;* Return content of directory
+      $define OS$MKDIR          13       ;* Create a directory
+      $define OS$MKPATH         14       ;* Create a directory path
+      * 20240225 mab add chown to OSPATH function
+      $define OS$CHOWN        100       ;* Chown on file / directory
+*
+* LOCAL SUBROUTINES
+*
+**********************************************************************************************************************
+*
+*  setup defines
+*
+* EDB - extra dedugging
+*
+* EXTRA DEBUGGING
+$DEFINE EDB
+*--
+* USECVS - USE SD INTERNAL QUERY PROCESSOR WRITTING OUTPUT TO CSV FILE, READ THIS FILE AND CREATE SS REPORT FILE
+* OTHERWISE WE USE THE QUERY PROCESSOR TO CREATE A SELECT LIST OF IDS, AND PROCESS EACH RECORD.  THIS HAS ALL SORTS OF SHORTCOMINGS
+$DEFINE USECVS
+*
+*
+* Definition file, data item layout
+* see https://www.blog.pythonlibrary.org/2021/08/11/styling-excel-cells-with-openpyxl-and-python/
+* for more info on cell styling
+* 
+* Each defined cell has a line (fld) in the record
+*   Within each cell's def line, there are <VM> separated properties
+*     Some properties have <SVM> separated sub properties
+*
+$DEFINE DF_ITEM_NAME  1
+$DEFINE DF_CELL_REF   2
+$DEFINE DF_DATA_TYPE  3
+$DEFINE DF_FONT_STYLE 4
+	$DEFINE DF_FONT_NAME  1
+	$DEFINE DF_FONT_SZ    2
+    $DEFINE DF_FONT_BOLD  3
+	$DEFINE DF_FONT_ITLC  4
+    $DEFINE DF_FONT_UNLN  5
+    $DEFINE DF_FONT_STKE  6
+	$DEFINE DF_FONT_COLOR 7
+$DEFINE DF_ALIGNMENT  5
+	$DEFINE DF_ALIGN_HORZ 1
+    $DEFINE DF_ALIGN_VERT 2
+    $DEFINE DF_ALIGN_ROT  3
+	$DEFINE DF_ALIGN_WRAP 4
+	$DEFINE DF_ALIGN_SHRK 6
+    $DEFINE DF_ALIGN_IDNT 7
+$DEFINE DF_CELL_BORDR 6
+	$DEFINE DF_BORDR_STYLE 1
+	$DEFINE DF_BORDR_COLOR 2
+$DEFINE DF_CELL_FILL  7
+	$DEFINE DF_FILL_PATTRN 1
+	$DEFINE DF_FILL_FGCLR  2
+	$DEFINE DF_FILL_BGCLR  3
+	$DEFINE DF_FILL_TYPE   4	
+$DEFINE DF_DATA_PARAM 8
+*
+************************************************************************************************************************
+* START OF PROGRAM
+************************************************************************************************************************
+*
+* SETUP SOME VARIABLES USED THROUGHOUT PROGRAM
+*
+* ARRAY TO HOLD DICTIONARY RECORDS
+*
+DIM DICTIONARY_DATA_ARRAY(10)
+*
+LF = CHAR(10)    ;* ALL IMPORTANT LINE FEED
+*
+*$IFDEF EDB
+crt 'SD_QWK_RPT in debug mode'
+LOGMSG "SD_QWK_RPT: RPT_DEF_REC: "
+*LOGMSG RPT_DEF_REC
+LOGMSG REPORT_FILE_PATH:" ":REPORT_FILE_NAME
+LOGMSG "REPLACE_STRING: ":REPLACE_STRING
+LOGMSG "op1: ":OPTIONS<1>:" op2: ":OPTIONS<2>:" op3: ":OPTIONS<3>:" op4: ":OPTIONS<4>
+S_REC = ''
+OPEN 'BP' TO BP_FVAR ELSE
+  MY_STATUS = 1
+  CRT 'CANNOT OPEN BP FOR SCRIPT LOGGING'
+  GOTO MAIN.999
+END
+*$ENDIF
+*
+*
+* add in always available replacement strings
+*
+REPLACE_STRING<1,-1> = '%%RUNDATE%%'
+REPLACE_STRING<2,-1> =OCONV(DATE(), 'D/')
+
+REPLACE_STRING<1,-1> ='%%RUNTIME%%'
+REPLACE_STRING<2,-1> = OCONV(TIME(), 'MTH')
+*
+* SET INITIAL STATUS VALUE TO OK (0)
+MY_STATUS = 0  ;*
+HOLD_FILE_NAME = ''  ;* INIT THE HOLD FILE NAME TO EMPTY (FOR CSV FILE REPORT GEN)
+
+
+*
+* WHAT TYPE OF SS FILE DOES USER WANT (for now we only support xlsx)
+*
+SS_TYPE = OCONV(OPTIONS<1>,'MCL')
+BEGIN CASE
+   CASE SS_TYPE = 'xlsx'
+      NULL
+     CASE 1
+      SS_TYPE = 'xlsx'
+$IFDEF EDB
+      LOGMSG "SD_QWK_RPT: Unknown Spreadsheet Type: ":SS_TYPE:' Defaulted to xlsx'
+$ENDIF
+END CASE
+*
+
+*If Report_File_Path Exists then
+*  null
+*else
+*  create the path
+*end
+*
+IF OSPATH(REPORT_FILE_PATH,OS$EXISTS) THEN
+   NULL
+END ELSE  ;* PATH DOES NOT EXIST, TRY TO CREATE
+   IF OSPATH(REPORT_FILE_PATH,OS$MKPATH) THEN
+      NULL
+   END ELSE
+      MY_STATUS = 1
+      CALL !ERRTEXT(TEXT, STATUS())
+      LOGMSG "SD_QWK_RPT: Fail to Create Report File Path: " : REPORT_FILE_PATH : " - ":TEXT
+      GOTO MAIN.999
+   END
+END
+*
+* START UP PYTHON
+* AND IMPORT NEEDED MODULES
+* CREATE OUR WORKBOOK (wb)
+*   AND THE WORKSHEET (ws) 
+CALL !PY_INITIALIZE(RTN)
+IF RTN <> 0 THEN
+   MY_STATUS = 1
+   LOGMSG "SD_QWK_RPT: PY_INITIALIZE ERROR: ":RTN:",  Abort Report"
+   GOTO MAIN.999  ;* EXIT ON ERROR
+END
+*
+* INIT PYTHON
+*
+CALL !PY_INITIALIZE(RTN)
+IF RTN <> 0 THEN
+   MY_STATUS = 1
+   LOGMSG "SD_QWK_RPT: PY_INITIALIZE ERROR: ":RTN:",  Abort Report"
+   GOTO MAIN.999  ;* EXIT ON ERROR
+END
+*
+* LOAD IN THE MODULES WE WILL NEED
+*  AND CREATE OUR WORKBOOK AND WORKSHEET
+*
+* Note to allow for mult work sheets we must numerate ws objects
+*
+WS_NMBR = 1
+WS_OBJ  = "ws":WS_NMBR
+*
+SCRIPT  = "from openpyxl import Workbook":LF
+SCRIPT := "from openpyxl.styles import PatternFill, Border, Side, Alignment, Protection, Font":LF
+SCRIPT := "wb = Workbook()":LF
+SCRIPT := WS_OBJ: " = wb.active":LF
+SCRIPT := WS_OBJ: '.title = "sheet1"':LF
+
+$IFDEF EDB
+  S_REC := SCRIPT
+$ENDIF
+CALL !PY_RUNSTRING(SCRIPT,RTN)
+IF RTN <> 0 THEN
+   MY_STATUS = 1
+   LOGMSG "SD_QWK_RPT: PY_RUNSTRING ERROR: ":RTN:",  Abort Report"
+   LOGMSG "SD_QWK_RPT: SCRIPT: ":SCRIPT
+   GOTO MAIN.999  ;* EXIT ON ERROR
+END
+* Parse Def_File and create the report  file
+GOSUB PARSE_DEF_FILE
+IF MY_STATUS = 1 THEN
+   GOTO MAIN.999  ;* EXIT ON ERROR
+END
+*
+SCRIPT = 'wb.save("':REPORT_FILE_PATH:@DS:REPORT_FILE_NAME:'")':LF
+$IFDEF EDB
+  S_REC := SCRIPT
+$ENDIF
+
+CALL !PY_RUNSTRING(SCRIPT,RTN)
+IF RTN <> 0 THEN
+   MY_STATUS = 1
+   LOGMSG "SD_QWK_RPT: PY_RUNSTRING ERROR: ":RTN:",  Abort Report"
+   LOGMSG "SD_QWK_RPT: SCRIPT: ":SCRIPT
+   GOTO MAIN.999  ;* EXIT ON ERROR
+END
+*
+MAIN.999: *
+$IFDEF EDB
+  WRITE S_REC ON BP_FVAR, 'SD_QWK_SCRIPT'
+$ENDIF
+*
+LOGMSG "SD_QWK_RPT: Finished, Status: ":MY_STATUS
+
+RETURN
+*---------------------------------------------------
+PARSE_DEF_FILE: *
+* SUBROUTINE PROCESS REPORT DEFINITION FILE
+* RPT_DEF_REC - VARIABLE CONTAINING PREVIOUSLY READ REPORT DEFINITION RECORD
+*
+* SETUP SOME VARIABLES
+DEF_REC_LN = 10  ;* Init LINE NUMBER (FIELD) OF REPORT DEFINITION RECORD BEING PROCESSED
+LOC_ROW = 0      ;* LOCATION OF SPREADSHEET CELL ROW  TO BE CREATED 
+QUERY_START_ROW = 0   ;* where the first query row will be (if any)
+LAST_QUERY_ROW = 0    ;* LAST ROW WRITTEN TO DURING QUERY
+MY_STATUS = 0         ;* FAILURE STATUS FLAG
+*
+DEF_REC_LN_COUNT = DCOUNT(RPT_DEF_REC,@FM)
+
+*
+LOOP
+WHILE (DEF_REC_LN LT DEF_REC_LN_COUNT) AND  (MY_STATUS = 0)
+   *
+   *
+   DEF_REC_LN += 1
+   *
+   * break out current line being processed
+   *
+   DEF_LN_DATA = RPT_DEF_REC<DEF_REC_LN>
+   *
+$IFDEF EDB
+   LOGMSG "SD_QWK_RPT: Processing def_rec Ln ":DEF_REC_LN:" : ":RPT_DEF_REC<DEF_REC_LN>
+$ENDIF
+   *
+   *  Parse Record, Format Cell Address, Data Type, Data or Query String
+   *  Item Name / Ref  <vm> Cell Ref   <vm>  Data Type <vm>  font <vm> font size <vm>  color <vm> alignment <vm>  list of  text styles  (bold, italic, underline) <vm> list of  Data Type parameters
+   *
+   * BREAK OFF ROW NUMBER FROM FORMAT CELL ADDRESS (IE A1 TO 1)
+   *
+   CELL_ADDR = DEF_LN_DATA<1,DF_CELL_REF>
+   GOSUB CELL_ADDRESS_TO_ROW_COL
+   *   RETURNS CELL_ROW_NBR / CELL_COL_LTR
+   IF CELL_ROW_NBR = 0 THEN
+      LOGMSG "SD_QWK_RPT: Invalid Format Cell Address @ Ln: " :DEF_REC_LN : " - ":CELL_ADDR
+      CONTINUE
+   END 
+   *
+   *
+ 
+   IF QUERY_START_ROW = 0  THEN  ;* NO QUERY AS OF YET
+      LOC_ROW = CELL_ROW_NBR
+   END ELSE                      ;* WE HAVE HAD A QUERY OPERATION
+      LOC_ROW = LAST_QUERY_ROW
+   END
+   *
+   * PARSE DATA TYPE
+   *
+   DATA_TYPE = DEF_LN_DATA<1,DF_DATA_TYPE>
+   BEGIN CASE
+      CASE DATA_TYPE = "W"
+	     * CREATE NEW WORK SHEET, MAKE IT ACTIVE
+		 WS_NMBR += 1
+         WS_OBJ  = "ws":WS_NMBR
+		 SCRIPT = WS_OBJ:' = wb.create_sheet("sheet':WS_NMBR:'")':LF
+		 SCRIPT := "wb.active = ":WS_NMBR:LF
+$IFDEF EDB
+            S_REC := SCRIPT
+$ENDIF
+         CALL !PY_RUNSTRING(SCRIPT,RTN)
+		 IF RTN <> 0 THEN
+		   MY_STATUS = 1
+		   LOGMSG "SD_QWK_RPT: PY_RUNSTRING ERROR: ":RTN:",  Abort Report"
+		   LOGMSG "SD_QWK_RPT: SCRIPT: ":SCRIPT
+		 END
+		 *
+		 * ON NEW SHEET, RESET THE ROW COUNTER / QUERY_START_ROW
+		 *
+		 QUERY_START_ROW = 0
+		 LOC_ROW = CELL_ROW_NBR
+		 
+		 
+      CASE  DATA_TYPE = "T"
+         *  TEXT DATA TYPE, SIMPLY WRITE OUT TEXT
+         CELL_DATA = '"':DEF_LN_DATA<1,DF_DATA_PARAM>:'"'
+         GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,"",MY_STATUS)
+
+      CASE DATA_TYPE = "I"
+	     * image tbd
+         NULL   ;* TO BE CODED SEE openpyxl image doc
+         
+      CASE DATA_TYPE = "Q"
+	     QUERY_START_ROW = CELL_ROW_NBR
+         GOSUB PROCESS_SDQUERY
+ 
+      CASE DATA_TYPE = "L"    ;* IS THIS A LOOKUP?
+         GOSUB PROCESS_SDLOOKUP
+      
+      CASE DATA_TYPE = "R"   ;* IS THIS A REPLACE?
+         GOSUB PROCESS_SDREPLACE
+             *
+
+      CASE 1
+         LOGMSG "SD_QWK_RPT: Unknown Data Type  @ Ln: " :DEF_REC_LN : "-": DATA_TYPE:" ":DATA_TYPE
+         CONTINUE
+   END CASE
+   *
+   *Loop
+REPEAT
+*
+RETURN
+
+*
+*----------------------------------------------
+PROCESS_SDQUERY: *
+*
+* PROCESS THE QMQUERY REQUEST
+* DEF_LN_DATA - CURRENT DEFINITION RECORD LN
+*
+*Parse sdQuery Statement setting:
+*File_Name - SD File Name to generate report from  ie CUSTOMERS
+*Sort_By     - Sort Criteria    ie by cm.name
+*Qualifiers  - Selection Clause  ie with cm.status='ACTIVE'
+*Data_Fields<> - Field Names to report as defined in the QM File Dictionary ie  cm.name, cm.address, cm.phone
+* ASSUME THE FOLLOWING FORMAT:
+*"CUSTOMERS","BY CM.NAME","WITH CM.STATUS=''ACTIVE''","CM.NAME CM.ADDRESS CM.PHONE")
+* FIRST GET THE PARAMETER STRING
+*
+PARM_STR = TRIM(DEF_LN_DATA<1,DF_DATA_PARAM>)
+
+DPARSE.CSV PARM_STR, ",", FILE_NAME, SORT_BY, QUALIFIERS, DATA_FIELD_STR
+DATA_FIELD_STR = TRIM(DATA_FIELD_STR,' ',"B")
+
+$IFDEF EDB
+LOGMSG "SD_QWK_RPT: sdQUERY FILE_NAME: "  :FILE_NAME
+LOGMSG "SD_QWK_RPT: sdQUERY SORT_BY:   "  :SORT_BY
+LOGMSG "SD_QWK_RPT: sdQUERY QUALIFIERS: " :QUALIFIERS
+LOGMSG "SD_QWK_RPT: sdQUERY DATA_FIELD_STR:[" :DATA_FIELD_STR:']'
+$ENDIF
+*
+
+*
+* DATA_FIELD_STR CONTAINS THE DICTIONARY NAMES OF THE DATA TO REPORT, BREAK'EM OUT
+DICT_NAMES = ''
+QUERY_COL_COUNT = DCOUNT(DATA_FIELD_STR," ")
+FOR FC = 1 TO QUERY_COL_COUNT
+   DICT_NAMES<FC>  = FIELD(DATA_FIELD_STR," ",FC)
+$IFDEF EDB
+   LOGMSG "SD_QWK_RPT: Adding Dict: "  :DICT_NAMES<FC>
+$ENDIF
+NEXT FC
+*
+GOSUB GET_DICTS 
+IF DICT_STATUS = 1 THEN	
+    MY_STATUS = 1 ;* RETURN AS ERROR TO CALLER
+	GOTO PQ.999  ;* EXIT ON ERROR
+END
+*
+* SAVE QUERY COL REFS 
+* AND DATA ITEM PROPERTIES FOR EACH REPORT COLUMN
+QUERY_DEF = ""
+QUERY_COLS = ""
+QUERY_DEF<1> = DEF_LN_DATA
+QUERY_COLS<1> = DEF_LN_DATA<1,DF_CELL_REF>
+*//
+*// Test the next x (Count(Data_Fields)-1) records to ensure we have Query Cols for all of the Data_Fields found in the mvQuery statement
+*//
+$IFDEF EDB
+LOGMSG "SD_QWK_RPT: Total Dicts: "  :QUERY_COL_COUNT
+$ENDIF
+*
+FOR FC = 2 TO QUERY_COL_COUNT
+   *
+   *PROCESS NEXT RECORD / LINE FIELD OF REPORT DEFINITION LOOKING FOR QUERY COLUMN DEF
+   DEF_REC_LN += 1
+   * GET THE NEXT COL DEF AND SAVE IT
+   DEF_LN_DATA = RPT_DEF_REC<DEF_REC_LN>
+   QUERY_DEF<FC> = DEF_LN_DATA
+   QUERY_COLS<FC> = DEF_LN_DATA<1,DF_CELL_REF>
+   
+   DATA_TYPE = DEF_LN_DATA<1,DF_DATA_TYPE>
+   
+   IF DATA_TYPE # 'QC' THEN
+      MY_STATUS = 1
+      LOGMSG "SD_QWK_RPT: Missing QUERY Column Pairing @ Ln: " :DEF_REC_LN : "-": DEF_LN_DATA<1,DATA_TYPE> : " Abort Report"
+      GOTO PQ.999
+   END
+
+NEXT FC
+*
+* DOES THE FILE TO QUERY EXISTS?
+*
+OPEN  FILE_NAME TO FILE_VAR THEN
+   NULL
+END ELSE
+   *
+   MY_STATUS = 1
+   LOGMSG "SD_QWK_RPT: File ": FILE_NAME: " Not Found,  Abort Report"
+   CLOSE FILE_VAR
+   GOTO PQ.999  ;* EXIT ON ERROR
+END
+*
+*
+**
+* NOW PROCESS QUERY REQUEST BASED ON PROGRAM SETTINGS:
+* USECVS DEFINED - USE QM INTERNAL QUERY PROCESSOR WRITTING OUTPUT TO CSV FILE, READ THIS FILE AND CREATE SS XML/JSON REPORT DATA FILE
+* OTHERWISE WE USE THE QUERY PROCESSOR TO CREATE A SELECT LIST OF IDS, AND PROCESS EACH RECORD.  THIS HAS ALL SORTS OF SHORTCOMINGS
+*
+* FIRST SETUP THE COLUMNS TO AUTOSIZE
+*
+SCRIPT = ''
+FOR FC = 1 TO QUERY_COL_COUNT
+*
+* following trick from GPL.BP QPROC
+*get.width.and.justification:
+   * We find the field width by formatting a default string ("1") using
+   * the item's format specification.  This is the easiest way to handle
+   * decimals, masks, etc.
+
+   *item.display.width(item.index) = len(fmt("1", item.fmt(item.index)))
+  WIDTH_VAL = LEN(FMT("1",DICTIONARY_DATA_ARRAY(FC)<5>))
+  CELL_ADDR = QUERY_COLS<FC>
+  GOSUB CELL_ADDRESS_TO_ROW_COL
+  SCRIPT := ws_obj:'.column_dimensions["':CELL_COL_LTR:'"].width = ':width_val:LF
+NEXT FC
+CALL !PY_RUNSTRING(SCRIPT,RTN)
+$IFDEF EDB
+  S_REC := SCRIPT
+$ENDIF
+IF RTN <> 0 THEN
+   MY_STATUS = 1
+   LOGMSG "SD_QWK_RPT: PY_RUNSTRING ERROR: ":RTN:",  Abort Report"
+   GOTO PQ.999  ;* EXIT ON ERROR
+END
+*
+$IFDEF USECVS
+GOSUB BUILD_REPORT_CVS
+$ELSE
+GOSUB BUILD_REPORT
+$ENDIF
+PQ.999:
+RETURN
+*----------------------------------------------
+BUILD_REPORT_CVS:
+*
+* PROCESS QUERY USING SD INTERNAL QUERY PROCESSOR WRITTING OUTPUT TO CSV FILE, READ THIS FILE AND CREATE SS REPORT
+*
+* FILE_NAME - SD FILE TO PERFORM QUERY ON
+* SORT_BY - FIELDS (DICTIONARY NAMES) TO ORDER BY (SORT)
+* QUALIFIERS - SELECTION CLAUSE FOR DATA QUERY
+* DICT_NAMES - DYN ARRAY OF FIELD (DICTIONARY NAMES) TO ADD TO REPORT
+
+SLIST =  "SORT ":FILE_NAME
+IF SORT_BY # '' THEN
+   SLIST :=  " ":SORT_BY
+END
+IF  QUALIFIERS # '' THEN
+   SLIST := " ":QUALIFIERS
+END
+*
+SLIST := " ":DATA_FIELD_STR
+*
+HOLD_FILE_NAME = SYSTEM(38):@DS:@USERNO:'_SD_QWK_RPT'
+SLIST := " ID.SUP HDR.SUP COL.SUP COUNT.SUP CSV TO " :HOLD_FILE_NAME:" NO.QUERY "
+*
+$IFDEF EDB
+LOGMSG "SD_QWK_RPT: Query for @ Ln: " :DEF_REC_LN : "-": SLIST
+$ENDIF
+EXECUTE SLIST CAPTURING DMMY.OUT
+$IFDEF EDB
+LOGMSG "SD_QWK_RPT: Query Results: ":DMMY.OUT<1>
+$ENDIF
+IF DMMY.OUT THEN NULL
+*
+OPENSEQ HOLD_FILE_NAME TO FVAR ELSE
+   CALL !ERRTEXT(TEXT, STATUS())
+   MY_STATUS = 1
+   LOGMSG "SD_QWK_RPT:  Could Not Open ": HOLD_FILE_NAME : " File, ":  STATUS() : ' ' : TEXT :",  Abort Report"
+   GOTO BRC.999
+END
+*
+* LOOP TO PROCESS EACH LINE OF GENERATED DATA
+*
+LOOP
+   READSEQ DATALN FROM FVAR THEN
+$IFDEF EDB
+      LOGMSG "SD_QWK_RPT:  CSV Query LINE: ":DATALN
+$ENDIF
+      GOSUB PROCESS_CSV_LN
+
+   END ELSE
+      EXIT
+   END
+REPEAT
+CLOSESEQ FVAR
+* DELETE THE HOLD FILE
+$IFNDEF EDB
+ DELETESEQ HOLD_FILE_NAME ELSE
+ CALL !ERRTEXT(ETEXT, STATUS())
+ LOGMSG "SD_QWK_RPT: UNABLE TO DELETE ":HOLD_FILE_NAME: " Status():" :STATUS():' ':ETEXT
+END
+$ENDIF
+
+BRC.999: *
+LAST_QUERY_ROW = LOC_ROW - 1
+RETURN
+*----------------------------------------------
+PROCESS_CSV_LN:
+*
+* BREAK CSV DATA INTO INDIVIDUAL FIELDS
+* rem the following is populated
+* QUERY_COL_COUNT - expected number of columns of data 
+* QUERY_DEF       - Def Rec Line for each column
+* 
+DATAFIELDS = CSVDQ(DATALN)
+FIELD_CT = DCOUNT(DATAFIELDS,@FM)
+$IFDEF EDB
+LOGMSG "SD_QWK_RPT:  CSV Query Field Count: ":FIELD_CT
+$ENDIF
+
+FOR FI = 1 TO FIELD_CT
+   CELL_DATA = DATAFIELDS<FI>
+   DICT_REC  = DICTIONARY_DATA_ARRAY(FI)
+   IF FI > QUERY_COL_COUNT THEN
+      LOGMSG "SD_QWK_RPT:  Exceeded Expected Columns: ":QUERY_COL_COUNT:" CELL_DATA: ":CELL_DATA 
+   END ELSE
+      IF CELL_DATA # '' THEN
+         CELL_DATA = '"':CELL_DATA:'"'
+         GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<FI>,DICT_REC,PY_STATUS)
+      END
+   END	  
+NEXT FI
+LOC_ROW += 1  ;* NEXT SS ROW
+RETURN
+*----------------------------------------------
+BUILD_REPORT:
+
+*
+* SDQuery request will most likely result in multiple rows being added to the SS.
+* We also have to deal with fields that are multivalue (both value and sub value).
+* Multivalue fields that have (matching) Assiciations will be written 1 field value relationship per line repeating the non multivalue data*
+*    * we may want to provide an option to not repeat data.
+* Multivalue fields with different Association will be written on their own row(s).
+* Multivalue fields with no Association will be concatenated together and written on a single row?
+* NOTE THE ABOVE HAS YET TO BE IMPLEMENTED FOR NOW WE  JUST CONCATENATE MULTIVALUES INTO A SINGLE SS CELL.
+*
+*
+*//                Routine preforms query and creates associated xml entries
+* FILE_NAME - SD FILE TO PERFORM QUERY ON
+* SORT_BY - FIELDS (DICTIONARY NAMES) TO ORDER BY (SORT)
+* QUALIFIERS - SELECTION CLAUSE FOR DATA QUERY
+* DICT_NAMES - DYN ARRAY OF FIELD (DICTIONARY NAMES) TO ADD TO REPORT
+* FMT_CELL_ROW - DYN ARRAY OF FORMAT CELL ROW ADDRESS
+* FMT_CELL_COL - DYN ARRAY OF FORMAT CELL COL ADDRESS (THESE TWO CORRESPOND TO DICT_NAMES)
+*
+DICT_FILE_VAR = '' ;* FILE VARIABLE FOR DICTIONARY FILE
+FILE_VAR      = '' ;* FILE VARIABLE FOR DATA PORTION OF FILE
+*
+* DATA FIELDS DEFINED?
+*
+GOSUB GET_DICTS 
+IF DICT_STATUS = 1 THEN	
+    MY_STATUS = 1 ;* RETURN AS ERROR TO CALLER
+	GOTO BR.999  ;* EXIT ON ERROR
+END
+*
+SLIST =  "SSELECT ":FILE_NAME
+IF SORT_BY # '' THEN
+   SLIST :=  " ":SORT_BY
+END
+IF  QUALIFIERS # '' THEN
+   SLIST := " ":QUALIFIERS
+END
+*
+SLIST := "  TO 2"
+*
+$IFDEF EDB
+LOGMSG "SD_QWK_RPT: Query for @ Ln: " :DEF_REC_LN : "-": SLIST
+$ENDIF
+*
+EXECUTE SLIST CAPTURING DMMY.OUT
+$IFDEF EDB
+LOGMSG "SD_QWK_RPT: Query Results: ":DMMY.OUT<1>
+$ENDIF
+**
+IF @SELECTED GE 1 THEN
+   READLIST ID_LIST FROM 2 THEN
+      ID_COUNT = DCOUNT(ID_LIST,@AM)
+   END
+END ELSE
+   ID_COUNT = 0
+   ID_LIST = ""
+END
+*
+* If there are records from query, process report
+*
+IF ID_COUNT = 0 THEN
+$IFDEF EDB
+   LOGMSG "SD_QWK_RPT: No Records found for Query @ Ln: " :DEF_REC_LN : "-": SLIST
+$ENDIF
+   GOTO BR.999
+END
+*
+* Now create ss entrys for this query
+*
+FOR E = 1 TO ID_COUNT
+   REC_ID = ID_LIST<E>
+   READ DATA_REC FROM FILE_VAR, REC_ID THEN
+      FOR DC = 1 TO DICT_COUNT
+         *  get data based on type of dictionary item
+         
+         DICT_REC = DICTIONARY_DATA_ARRAY(DC)
+         BEGIN CASE
+
+            CASE DICTIONARY_DATA_ARRAY(DC)<1> = "D"
+               *  D Type just pull and format, usless it points to field 0!
+               FLD_PTR = DICTIONARY_DATA_ARRAY(DC)<2>
+               IF FLD_PTR = 0 THEN  ;* USE ID !
+                  CELL_DATA = REC_ID
+               END ELSE
+                  CELL_DATA = DATA_REC<FLD_PTR>
+               END
+               *
+               * DOES THIS FIELD HAVE VALUES?
+               VALUECT =  DCOUNT(CELL_DATA,@VM)
+$IFDEF EDB
+               LOGMSG "SD_QWK_RPT: Multi Value Count: ":VALUECT
+$ENDIF
+               *
+               * GET THE FORMAT FOR THIS FIELD
+               FMT_CODE = DICTIONARY_DATA_ARRAY(DC)<3>
+
+               TEMP_DATA = CELL_DATA
+               CELL_DATA = ''
+
+               FOR VCT = 1 TO VALUECT
+                  IF FMT_CODE # '' THEN
+                     CELL_DATA = CELL_DATA :' ': OCONV(TEMP_DATA<1,VCT>,FMT_CODE)
+                  END ELSE
+                     CELL_DATA = CELL_DATA :' ': TEMP_DATA<1,VCT>
+                  END
+               NEXT VCT
+               CELL_DATA = TRIM(CELL_DATA,' ',"B")
+
+			   GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<DC>,DICT_REC,PY_STATUS)
+
+            CASE DICTIONARY_DATA_ARRAY(DC)<1> = "I" OR DICTIONARY_DATA_ARRAY(DC)<1> = "C"
+               * I OR C TYPES NEED SYSTEMS HELP TO GET ACTUAL DATA
+               @RECORD = DATA_REC
+               CELL_DATA = ITYPE(DICTIONARY_DATA_ARRAY(DC))
+               GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<DC>,DICT_REC,PY_STATUS)
+            CASE 1
+               *   DICTIONARY TYPE THAT WE CURRENTLY DO NOT HANDLE, REPORT
+               CELL_DATA = DICT_NAMES<DC>: ' Dict Type Not Currently Handled'
+               GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<DC>,DICT_REC,PY_STATUS)
+         END CASE
+      NEXT DC
+      *
+   END ELSE
+      CELL_DATA = "Record: ":REC_ID: " Not Found In File: ":FILE_NAME
+      GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<DC>,DICT_REC,PY_STATUS)
+   END
+   *
+   LOC_ROW += 1  ;* NEXT SS ROW
+   *
+NEXT E
+*
+BR.999: *
+LAST_QUERY_ROW = LOC_ROW - 1
+CLOSE DICT_FILE_VAR
+
+RETURN
+*-----------------------------------------------------------------------------------------
+PROCESS_SDLOOKUP: *
+* sdLOOKUP("filename","record","field#-or-dictionary name")
+* FIRST GET THE PARAMETER STRING
+PARM_STR = TRIM(DEF_LN_DATA<1,DF_DATA_PARAM>)
+
+DPARSE.CSV PARM_STR, ",", FILE_NAME, RECORD_ID, FLD_OR_DICT
+$IFDEF EDB
+LOGMSG "SD_QWK_RPT: sdLOOKUP FILE_NAME: "   :FILE_NAME
+LOGMSG "SD_QWK_RPT: sdLOOKUP RECORD_ID:  "  :RECORD_ID
+LOGMSG "SD_QWK_RPT: sdLOOKUP FLD_OR_DICT: " :FLD_OR_DICT
+$ENDIF
+
+DICT_FILE_VAR = '' ;* FILE VARIABLE FOR DICTIONARY FILE
+FILE_VAR      = '' ;* FILE VARIABLE FOR DATA PORTION OF FILE
+*
+* FILE EXISTS?
+*
+OPEN  FILE_NAME TO FILE_VAR THEN
+   *
+   * GET THE RECORD
+   *
+   READ REC_DATA FROM FILE_VAR, RECORD_ID THEN
+      *
+      * DICTIONARY OR FIELD NUMBER GIVEN?
+      *
+      IF NUM(FLD_OR_DICT) THEN
+
+         *  FIELD NUMBER, PULL IT OFF
+         *
+         FLD_OR_DICT = ABS(INT(FLD_OR_DICT))
+         CELL_DATA = REC_DATA<FLD_OR_DICT,1,1>
+         GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,"",PY_STATUS)
+      END ELSE
+         * DICTIONARY
+         OPEN "DICT", FILE_NAME TO DICT_FILE_VAR THEN
+
+            READ DICTIONARY_DATA FROM DICT_FILE_VAR, FLD_OR_DICT THEN
+               BEGIN CASE
+                  CASE DICTIONARY_DATA<1> = "D"
+                     *  D Type just pull and format, usless it points to field 0!
+                     FLD_PTR = DICTIONARY_DATA<2>
+                     IF FLD_PTR = 0 THEN  ;* USE ID !
+                        CELL_DATA = RECORD_ID
+                     END ELSE
+                        CELL_DATA = REC_DATA<FLD_PTR>
+                     END
+                     * IS THERE A FORMAT ?
+                     FMT_CODE = DICTIONARY_DATA<3>
+                     IF FMT_CODE # '' THEN
+                        CELL_DATA = OCONV(CELL_DATA,FMT_CODE)
+                     END
+                     GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,DICTIONARY_DATA,PY_STATUS)
+                  CASE DICTIONARY_DATA<1> = "I" OR DICTIONARY_DATA<1> = "C"
+                     * I OR C TYPES NEED SYSTEMS HELP TO GET ACTUAL DATA
+                     @RECORD = DATA_REC
+                     CELL_DATA = ITYPE(DICTIONARY_DATA)
+                     GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,DICTIONARY_DATA,PY_STATUS)
+                  CASE 1
+                     *   DICTIONARY TYPE THAT WE CURRENTLY DO NOT HANDLE, REPORT
+                     CELL_DATA = FLD_OR_DICT: ' Dict Type Not Currently Handled'
+                     GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,DICTIONARY_DATA,PY_STATUS)
+               END CASE
+            END ELSE
+               CELL_DATA = "Dictionary Item ":FLD_OR_DICT:" for ": FILE_NAME: " Not Found"
+               GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,DICTIONARY_DATA,PY_STATUS)
+            END
+
+            *
+         END ELSE
+            MY_STATUS = 1
+            LOGMSG "SD_QWK_RPT: sdLOOKUP -  Dictionary for ": FILE_NAME: " Not Found @ Ln: " : DEF_REC_LN : " Abort Report"
+            GOTO LOOKUP.999  ;* EXIT ON ERROR
+         END
+
+      END
+
+   END ELSE
+      CELL_DATA = "Record: ":RECORD_ID: " Not Found In File: ":FILE_NAME
+      GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,"",PY_STATUS)
+   END
+   *
+END ELSE
+   *
+   MY_STATUS = 1
+   LOGMSG "SD_QWK_RPT: File ": FILE_NAME: " Not Found,  Abort Report"
+   GOTO LOOKUP.999  ;* EXIT ON ERROR
+END
+
+
+LOOKUP.999:
+CLOSE FILE_VAR
+RETURN
+*-----------------------------------------------------------
+PROCESS_SDREPLACE:
+* sdREPLACE("TOKEN")
+* FIRST GET THE PARAMETER STRING
+PARM_STR = TRIM(DEF_LN_DATA<1,DF_DATA_PARAM>)
+
+DPARSE.CSV PARM_STR, ",", TOKEN, DMMY.OUT
+TOKEN = TRIM(TOKEN,'"','A')
+TOKEN = OCONV(TOKEN, 'MCU')
+$IFDEF EDB
+LOGMSG "SD_QWK_RPT: MVREPLACE TOKEN: "  :TOKEN
+$ENDIF
+*
+LOCATE TOKEN IN REPLACE_STRING<1,1> SETTING POS THEN
+  CELL_DATA = REPLACE_STRING<1,POS>
+END ELSE
+   CELL_DATA = TOKEN:' not found'
+END
+*
+GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,"",PY_STATUS)
+RETURN
+*-----------------------------------------------------------
+CELL_ADDRESS_TO_ROW_COL: *
+* CONVERTS CELL ADDRESS IE "A1" TO ROW NUMBER AND  COLUMN LETTER
+*   PASSED  CELL_ADDR IE "A1"
+*   RETURNS CELL_ROW_NBR / CELL_COL_LTR
+*                      1              A
+CELL_ROW_NBR = 0
+CELL_COL_LTR = ""
+
+CONVERT "$" TO "" IN CELL_ADDR
+*
+ADD_LEN = LEN(CELL_ADDR)
+FOR C = 1 TO ADD_LEN
+   *      CRT "CELL_ADDR[":C:",1]: ":CELL_ADDR[C,1]
+   IF NUM(CELL_ADDR[C,1]) THEN
+      CELL_ROW_NBR = CELL_ADDR[ADD_LEN - C + 1]  ;* BALANCE OF CELL ADDR STRING SHOULD BE THE ROW
+      EXIT
+   END ELSE
+      CELL_COL_LTR := CELL_ADDR[C,1]
+   END
+NEXT C
+
+RETURN
+
+*----------------------------------------------------------------
+* GET_DICTS
+* GET DICTIONARIES FOR DATA COLUMNS TO BE WRITTEN
+* ASSUMES ENTRIES DICTIONARY_DATA_ARRAY WILL BE IN "COLUMN ORDER"
+*
+* FILE_NAME  - NAME OF DATA BASE FILE 
+* DICT_NAMES - DYN ARRAY OF DICTINARY NAMES TO GET
+*
+* RETURNS DICTIONARY_DATA_ARRAY - ARRAY OF DICTIONARY Records
+*         DICT_COUNT - COUNT OF DICTIONARIES LOADED
+*         DICT_STATUS - 0 OK
+*                     - 1 FAILED
+*
+GET_DICTS: 
+    DICT_STATUS = 0 ;* ASSUME THIS WILL WORK
+	DICT_COUNT = DCOUNT(DICT_NAMES,@FM)
+	IF DICT_COUNT = 0 THEN
+	   DICT_STATUS = 1
+	   LOGMSG "SD_QWK_RPT: No Data Fields Defined in Query @ Ln: " :DEF_REC_LN :" Abort Report"
+	   GOTO GET_DICT.999  ;* EXIT ON ERROR
+	END ELSE
+	   *NEED TO RESIZE ARRAY?
+	   IF INMAT(DICTIONARY_DATA_ARRAY) < DICT_COUNT THEN
+	   	   DIM DICTIONARY_DATA_ARRAY(DICT_COUNT)
+	   END
+	END
+ 
+   * Get Dictionaries
+
+   OPEN "DICT", FILE_NAME TO DICT_FILE_VAR THEN
+      FOR DC = 1 TO DICT_COUNT
+         READ DICTIONARY_DATA_ARRAY(DC) FROM DICT_FILE_VAR, DICT_NAMES<DC> THEN
+            NULL
+         END ELSE
+            DICT_STATUS = 1
+            LOGMSG "SD_QWK_RPT: Dictionary Item ":DICT_NAMES<DC>:" for ": FILE_NAME: " Not Found @ Ln: " :DEF_REC_LN: " Abort Report"
+            GOTO GET_DICT.999  ;* EXIT ON ERROR
+         END
+      NEXT DC
+      *
+   END ELSE
+      DICT_STATUS = 1
+      LOGMSG "SD_QWK_RPT: Dictionary for ": FILE_NAME: " Not Found @ Ln: " :DEF_REC_LN : " Abort Report"
+   END
+GET_DICT.999:  *   
+RETURN
+*--------------------------------------------------------------
+*
+* DEFINE SOME LOCAL SUBROUTINES
+*
+*--------------------------------------------------------------
+* WRITECELL
+LOCAL SUBROUTINE WRITECELL(L_ROW,CELL_DATA,DEF_LN_DATA,DICT_REC,PY_STATUS)
+*
+CELL_DATA = TRIM(CELL_DATA)
+IF CELL_DATA # '' THEN
+   * GET THE COL LETTER FOR THIS Data
+   *
+   CELL_ADDR = DEF_LN_DATA<1,DF_CELL_REF>
+   GOSUB CELL_ADDRESS_TO_ROW_COL
+   ADDR_STR = CELL_COL_LTR:L_ROW
+   *
+   PY_STATUS = 0
+   *
+   * SEND TO openpyxl
+   SCRIPT = WS_OBJ:'["':ADDR_STR:'"] = ':CELL_DATA:LF
+   CALL !PY_RUNSTRING(SCRIPT,RTN)
+   IF RTN <> 0 THEN
+     LOGMSG "SD_QWK_RPT: script failed: ":SCRIPT 
+     MY_STATUS = 1
+   END
+   $IFDEF EDB
+     S_REC := SCRIPT
+   $ENDIF
+*
+* add format data
+* 
+*  $DEFINE DF_FONT_STYLE 4
+*  	$DEFINE DF_FONT_NAME  1
+*  	$DEFINE DF_FONT_SZ    2
+*      $DEFINE DF_FONT_BOLD  3
+*  	$DEFINE DF_FONT_ITLC  4
+*      $DEFINE DF_FONT_UNLN  5
+*      $DEFINE DF_FONT_STKE  6
+*  	$DEFINE DF_FONT_COLOR 7
+*  $DEFINE DF_ALIGNMENT  5
+*  	$DEFINE DF_ALIGN_HORZ 1
+*      $DEFINE DF_ALIGN_VERT 2
+*      $DEFINE DF_ALIGN_ROT  3
+*  	$DEFINE DF_ALIGN_WRAP 4
+*  	$DEFINE DF_ALIGN_SHRK 6
+*      $DEFINE DF_ALIGN_IDNT 7
+*  $DEFINE DF_CELL_BORDR 6
+*  	$DEFINE DF_BORDR_STYLE 1
+*  	$DEFINE DF_BORDR_COLOR 2
+*  $DEFINE DF_CELL_FILL  7
+*  	$DEFINE DF_FILL_PATTRN 1
+*  	$DEFINE DF_FILL_FGCLR  2
+*  	$DEFINE DF_FILL_BGCLR  3
+*  	$DEFINE DF_FILL_TYPE   4	
+
+
+$IFDEF EDB
+   LOGMSG "SD_QWK_RPT: cell ADDR / cell Data: " : ADDR_STR :" / " :CELL_DATA 
+$ENDIF
+   *
+END
+RETURN
+END
+
+*----------------------------------------------------------------
+END

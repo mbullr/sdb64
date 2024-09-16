@@ -1,0 +1,130 @@
+PROGRAM SD_QWK_TEST
+**************************************************************************
+* Copyright (c)2024 The SD Developers, All Rights Reserved
+*
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation; either version 3, or (at your option)
+* any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software Foundation,
+* Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+*
+*
+**************************************************************************
+*
+* MODULE: SD_QWK_TEST
+* AUTHOR: MAB
+* VERSION: 1.0.0
+* CREATED: 09/xx/2024
+* UPDATED:
+*
+* MAINTENANCE RECORD:
+*
+* EQUATE:
+*
+* PROGRAM TO TEST SD_QWK_RPT
+* create a report def
+*
+$DEFINE DF_ITEM_NAME  1
+$DEFINE DF_CELL_REF   2
+$DEFINE DF_DATA_TYPE  3
+$DEFINE DF_FONT_STYLE 4
+	$DEFINE DF_FONT_NAME  1
+	$DEFINE DF_FONT_SZ    2
+    $DEFINE DF_FONT_BOLD  3
+	$DEFINE DF_FONT_ITLC  4
+    $DEFINE DF_FONT_UNLN  5
+    $DEFINE DF_FONT_STKE  6
+	$DEFINE DF_FONT_COLOR 7
+$DEFINE DF_ALIGNMENT  5
+	$DEFINE DF_ALIGN_HORZ 1
+    $DEFINE DF_ALIGN_VERT 2
+    $DEFINE DF_ALIGN_ROT  3
+	$DEFINE DF_ALIGN_WRAP 4
+	$DEFINE DF_ALIGN_SHRK 6
+    $DEFINE DF_ALIGN_IDNT 7
+$DEFINE DF_CELL_BORDR 6
+	$DEFINE DF_BORDR_STYLE 1
+	$DEFINE DF_BORDR_COLOR 2
+$DEFINE DF_CELL_FILL  7
+	$DEFINE DF_FILL_PATTRN 1
+	$DEFINE DF_FILL_FGCLR  2
+	$DEFINE DF_FILL_BGCLR  3
+	$DEFINE DF_FILL_TYPE   4	
+$DEFINE DF_DATA_PARAM 8
+*
+*TITLE <vm> B5  <vm> ‘T’ <vm> ‘Times New Roman’ <vm> 12 <vm> RRGGBB  <vm> centered <vm>  bold,italic,underline <vm> ‘ Title Of My Report’
+*QUERY1 <vm> D2 <vm> ‘Q’ <vm> ‘Lucida Sans’ <vm> 12 <vm> RRGGBB  <vm> left <vm>   <vm> file name, sort by, qualifier, fields eg)
+*"CUSTOMERS","BY CM.NAME","WITH CM.STATUS='ACTIVE'","CM.NAME CM.ADDRESS CM.PHONE" 
+
+*
+
+def_rec = ''
+def_rec<11,DF_ITEM_NAME> = "TITLE"
+def_rec<11,DF_CELL_REF> = "C2"
+def_rec<11,DF_DATA_TYPE> = "T"
+def_rec<11,DF_DATA_PARAM> = "My Customer Report"
+
+*
+def_rec<12,DF_ITEM_NAME> = "QUERY1"
+def_rec<12,DF_CELL_REF> = "A5"
+def_rec<12,DF_DATA_TYPE> = "Q"
+def_rec<12,DF_DATA_PARAM> = '"CUSTOMERS","BY CM_NAME","WITH CM_STATUS =' : "'A'" : '"' : ',"CM_NAME CM_ADDR CM_PHONE"'
+*
+def_rec<13,DF_ITEM_NAME> = "QC1"
+def_rec<13,DF_CELL_REF> = "B5"
+def_rec<13,DF_DATA_TYPE> = "QC"
+*
+def_rec<14,DF_ITEM_NAME> = "QC2"
+def_rec<14,DF_CELL_REF> = "C5"
+def_rec<14,DF_DATA_TYPE> = "QC"
+*
+def_rec<15,DF_ITEM_NAME> = "SHEET2"
+def_rec<15,DF_CELL_REF> = "A1"
+def_rec<15,DF_DATA_TYPE> = "W"
+
+def_rec<16,DF_ITEM_NAME> = "TITLE"
+def_rec<16,DF_CELL_REF> = "C2"
+def_rec<16,DF_DATA_TYPE> = "T"
+def_rec<16,DF_DATA_PARAM> = "Customer By State Report"
+*
+def_rec<17,DF_ITEM_NAME> = "QUERY2"
+def_rec<17,DF_CELL_REF> = "A5"
+def_rec<17,DF_DATA_TYPE> = "Q"
+def_rec<17,DF_DATA_PARAM> = '"CUSTOMERS","BY CM_STATE","WITH CM_STATUS =' : "'A'" : '"' : ',"CM_NAME CM_ADDR CM_STATE"'
+*
+def_rec<18,DF_ITEM_NAME> = "QC1"
+def_rec<18,DF_CELL_REF> = "B5"
+def_rec<18,DF_DATA_TYPE> = "QC"
+*
+def_rec<19,DF_ITEM_NAME> = "QC2"
+def_rec<19,DF_CELL_REF> = "C5"
+def_rec<19,DF_DATA_TYPE> = "QC"
+
+
+DEF_FILE = "SD_REPORTS"
+DEF_FILE_ID = "CM_RPT"
+REPORT_FILE_PATH = "/var/samba/reports"
+REPORT_FILE_NAME = "cm_report.xlsx"
+REPLACE_STRING = ""
+OPTIONS = 'xlsx'
+MY_STATUS = 0
+
+OPEN DEF_FILE TO DF_FILE_VAR THEN
+  WRITE def_rec on DF_FILE_VAR, DEF_FILE_ID 
+END ELSE
+  CRT 'CANNOT OPEN: ':DEF_FILE
+  STOP
+END
+*
+
+CALL SD_QWK_RPT(def_rec, REPORT_FILE_PATH, REPORT_FILE_NAME, REPLACE_STRING, OPTIONS, MY_STATUS)
+
+END
