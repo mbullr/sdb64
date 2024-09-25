@@ -60,10 +60,98 @@ $DEFINE DF_CELL_FILL  7
 	$DEFINE DF_FILL_TYPE   4	
 $DEFINE DF_DATA_PARAM 8
 *
-*TITLE <vm> B5  <vm> ‘T’ <vm> ‘Times New Roman’ <vm> 12 <vm> RRGGBB  <vm> centered <vm>  bold,italic,underline <vm> ‘ Title Of My Report’
-*QUERY1 <vm> D2 <vm> ‘Q’ <vm> ‘Lucida Sans’ <vm> 12 <vm> RRGGBB  <vm> left <vm>   <vm> file name, sort by, qualifier, fields eg)
-*"CUSTOMERS","BY CM.NAME","WITH CM.STATUS='ACTIVE'","CM.NAME CM.ADDRESS CM.PHONE" 
+equate CM_NAME               to    1
+equate CM_ADDR               to    2
+equate CM_ADDR2              to    3
+equate CM_CITY               to    4
+equate CM_STATE              to    5
+equate CM_ZIP                to    6
+equate CM_STATUS             to    7
+equate CM_TERMS              to    8
+*
+* DOES OUR TEST FILE EXIST?
+*
+OPEN "CUSTOMERS" TO CM_FILE THEN
+	CRT 'CUSTOMERS ALREADY EXISTS'
+END ELSE
+*
+* NOPE, CREATE IT
+*
+	CRT 'CREATING CUSTOMER FILE'
+	EXECUTE "CREATE.FILE CUSTOMERS"
+* NOW OPEN IT
+	OPEN "CUSTOMERS" TO CM_FILE ELSE
+	  CRT 'CANNOT CREATE CUSTOMERS'
+	  STOP
+	END
+* CREATE RECORDS
+	OPEN "BP" TO BP_FILE THEN
+		READ CM_RECS FROM BP_FILE, "cm_csv" THEN
+			REC_CNT = DCOUNT(CM_RECS,@FM)
+			FOR I = 1 TO REC_CNT
+			    REC = CM_RECS<I>
+				DATAFIELDS = CSVDQ(REC)
+				* ID, CM_NAME, CM_ADDR, CM_CITY, CM_STATE, CM_ZIP, CM_STATUS, CM_TERMS
+				CM_REC = ''
+				CM_REC<CM_NAME> = DATAFIELDS<2>
+				CM_REC<CM_ADDR> = DATAFIELDS<3>
+				CM_REC<CM_CITY> = DATAFIELDS<4>
+				CM_REC<CM_STATE> = DATAFIELDS<5>
+				CM_REC<CM_ZIP> = DATAFIELDS<6>
+				CM_REC<CM_STATUS> = DATAFIELDS<7>
+				CM_REC<CM_TERMS>  = DATAFIELDS<8>
+				CM_ID = DATAFIELDS<1>
+				*
+				WRITE CM_REC ON CM_FILE, CM_ID
+			NEXT I
+		END ELSE
+			CRT 'CANNOT READ cm_csv FROM BP'
+			STOP
+		END
+	END ELSE
+		CRT 'CANNOT OPEN BP'
+		STOP
+	END
+	
+	CLOSE BP_FILE
+	CLOSE CM_FILE
+*
+* now the dictionary
+*
+	dicts = ''
+	dicts<-1> = 'CM_NAME,D,1,,NAME,25T,S'
+	dicts<-1> = 'CM_ADDR2,D,3,,ADDRESS 2,25T,S'
+	dicts<-1> = '@ID,D,0,,CUSTOMERS,10L,S'
+	dicts<-1> = 'CM_ADDR,D,2,,ADDRESS,25T,S'
+	dicts<-1> = 'CM_CITY,D,4,,CITY,25T,S'
+	dicts<-1> = 'CM_STATE,D,5,,STATE,15T,S'
+	dicts<-1> = 'CM_ZIP,D,6,,ZIP,10T,S'
+	dicts<-1> = 'CM_PHONE,D,9,,CUSTOMER PHONE,20T,S'
+	dicts<-1> = 'CM_STATUS,D,7,,CREDIT STATUS,15T,S'
+	dicts<-1> = 'CM_TERMS,D,8,,CREDIT TERMS,10T,S'
+	OPEN "DICT", "CUSTOMERS" TO CM_DICT ELSE
+		CRT 'CANNOT OPEN CUSTOMER DICTIONARY'
+		STOP
+	END	
+	REC_CNT = DCOUNT(DICTS,@FM)
+	FOR I = 1 TO REC_CNT
+	    REC = DICTS<I>
+		DATAFIELDS = CSVDQ(REC)
+		ID = DATAFIELDS<1>
+		DICT_REC = ''
+		DICT_REC<1> = DATAFIELDS<2>
+		DICT_REC<2> = DATAFIELDS<3>
+		DICT_REC<3> = DATAFIELDS<4>
+		DICT_REC<4> = DATAFIELDS<5>
+		DICT_REC<5> = DATAFIELDS<6>
+		DICT_REC<6> = DATAFIELDS<7>
+		WRITE DICT_REC ON CM_DICT, ID
+	NEXT I
+	CLOSE CM_DICT
 
+END
+*
+CRT 'CREATE REPORT...'
 *
 
 def_rec = ''
@@ -77,44 +165,97 @@ def_rec<11,DF_FONT_STYLE,DF_FONT_SZ > = "20"
 def_rec<12,DF_ITEM_NAME> = "QUERY1"
 def_rec<12,DF_CELL_REF> = "A5"
 def_rec<12,DF_DATA_TYPE> = "Q"
-def_rec<12,DF_DATA_PARAM> = '"CUSTOMERS","BY CM_NAME","WITH CM_CITY =' : "'MPLS'" : '"' : ',"CM_NAME CM_ADDR CM_PHONE"'
+def_rec<12,DF_DATA_PARAM> = '"CUSTOMERS","BY CM_NAME","WITH CM_STATUS =' : "'A'" : '"' : ',"CM_NAME CM_ADDR CM_CITY CM_STATE CM_ZIP CM_STATUS"'
 def_rec<12,DF_FONT_STYLE,DF_FONT_COLOR > = "00FF0000" ;* red
 *
 def_rec<13,DF_ITEM_NAME> = "QC1"
 def_rec<13,DF_CELL_REF> = "B5"
 def_rec<13,DF_DATA_TYPE> = "QC"
-def_rec<13,DF_FONT_STYLE,DF_FONT_COLOR > = "0000FF00" ;* green
 *
 def_rec<14,DF_ITEM_NAME> = "QC2"
 def_rec<14,DF_CELL_REF> = "C5"
 def_rec<14,DF_DATA_TYPE> = "QC"
-def_rec<14,DF_FONT_STYLE,DF_FONT_COLOR > = "000000FF" ;* blue
-*
-GOTO SKIPRPT2
 
-def_rec<15,DF_ITEM_NAME> = "SHEET2"
-def_rec<15,DF_CELL_REF> = "A1"
-def_rec<15,DF_DATA_TYPE> = "W"
+def_rec<15,DF_ITEM_NAME> = "QC3"
+def_rec<15,DF_CELL_REF> = "D5"
+def_rec<15,DF_DATA_TYPE> = "QC"
 
-def_rec<16,DF_ITEM_NAME> = "TITLE"
-def_rec<16,DF_CELL_REF> = "C2"
-def_rec<16,DF_DATA_TYPE> = "T"
-def_rec<16,DF_DATA_PARAM> = "Customer By State Report"
-*
+def_rec<16,DF_ITEM_NAME> = "QC4"
+def_rec<16,DF_CELL_REF> = "E5"
+def_rec<16,DF_DATA_TYPE> = "QC"
+def_rec<16,DF_FONT_STYLE,DF_FONT_COLOR > = "0000FF00" ;* green
 
+def_rec<17,DF_ITEM_NAME> = "QC5"
+def_rec<17,DF_CELL_REF> = "G5"
+def_rec<17,DF_DATA_TYPE> = "QC"
+def_rec<17,DF_FONT_STYLE,DF_FONT_COLOR > = "000000FF" ;* blue
+*
+IX = 18
+def_rec<IX,DF_ITEM_NAME> = "SHEET2"
+def_rec<IX,DF_CELL_REF> = "A1"
+def_rec<IX,DF_DATA_TYPE> = "W"
 
-def_rec<17,DF_ITEM_NAME> = "QUERY2"
-def_rec<17,DF_CELL_REF> = "A5"
-def_rec<17,DF_DATA_TYPE> = "Q"
-def_rec<17,DF_DATA_PARAM> = '"CUSTOMERS","BY CM_STATE","WITH CM_STATUS =' : "'A'" : '"' : ',"CM_NAME CM_ADDR CM_STATE"'
+IX += 1
+def_rec<IX,DF_ITEM_NAME> = "DATE"
+def_rec<IX,DF_CELL_REF> = "I2"
+def_rec<IX,DF_DATA_TYPE> = "R"
+def_rec<IX,DF_DATA_PARAM> = "%%RUNDATE%%"
+
+IX += 1
+def_rec<IX,DF_ITEM_NAME> = "TIME"
+def_rec<IX,DF_CELL_REF> = "J2"
+def_rec<IX,DF_DATA_TYPE> = "R"
+def_rec<IX,DF_DATA_PARAM> = "%%RUNTIME%%"
+
+IX += 1
+def_rec<IX,DF_ITEM_NAME> = "TITLE"
+def_rec<IX,DF_CELL_REF> = "C2"
+def_rec<IX,DF_DATA_TYPE> = "T"
+def_rec<IX,DF_DATA_PARAM> = "Customer By State Report"
+def_rec<IX,DF_FONT_STYLE,DF_FONT_BOLD> = "True"
+def_rec<IX,DF_FONT_STYLE,DF_FONT_SZ > = "20"
 *
-def_rec<18,DF_ITEM_NAME> = "QC1"
-def_rec<18,DF_CELL_REF> = "B5"
-def_rec<18,DF_DATA_TYPE> = "QC"
+IX += 1
+def_rec<IX,DF_ITEM_NAME> = "hdr1"
+def_rec<IX,DF_CELL_REF> = "A4"
+def_rec<IX,DF_DATA_TYPE> = "T"
+def_rec<IX,DF_DATA_PARAM> = "Customer Name"
+def_rec<IX,DF_FONT_STYLE,DF_FONT_BOLD> = "True"
+def_rec<IX,DF_FONT_STYLE,DF_FONT_UNLN> = "single" 
+
+IX += 1
+def_rec<IX,DF_ITEM_NAME> = "hdr2"
+def_rec<IX,DF_CELL_REF> = "B4"
+def_rec<IX,DF_DATA_TYPE> = "T"
+def_rec<IX,DF_DATA_PARAM> = "Address"
+def_rec<IX,DF_FONT_STYLE,DF_FONT_BOLD> = "True"
+def_rec<IX,DF_FONT_STYLE,DF_FONT_UNLN> = "single" 
+
+IX += 1
+def_rec<IX,DF_ITEM_NAME> = "hdr3"
+def_rec<IX,DF_CELL_REF> = "C4"
+def_rec<IX,DF_DATA_TYPE> = "T"
+def_rec<IX,DF_DATA_PARAM> = "State"
+def_rec<IX,DF_FONT_STYLE,DF_FONT_BOLD> = "True"
+def_rec<IX,DF_FONT_STYLE,DF_FONT_UNLN> = "single" 
+
+IX += 1
+def_rec<IX,DF_ITEM_NAME> = "QUERY2"
+def_rec<IX,DF_CELL_REF> = "A5"
+def_rec<IX,DF_DATA_TYPE> = "Q"
+def_rec<IX,DF_DATA_PARAM> = '"CUSTOMERS","BY CM_STATE","WITH CM_STATUS =' : "'A'" : '"' : ',"CM_NAME CM_ADDR CM_STATE"'
 *
-def_rec<19,DF_ITEM_NAME> = "QC2"
-def_rec<19,DF_CELL_REF> = "C5"
-def_rec<19,DF_DATA_TYPE> = "QC"
+IX += 1
+def_rec<IX,DF_ITEM_NAME> = "QC1"
+def_rec<IX,DF_CELL_REF> = "B5"
+def_rec<IX,DF_DATA_TYPE> = "QC"
+*
+IX += 1
+def_rec<IX,DF_ITEM_NAME> = "QC2"
+def_rec<IX,DF_CELL_REF> = "C5"
+def_rec<IX,DF_DATA_TYPE> = "QC"
+def_rec<IX,DF_FONT_STYLE,DF_FONT_ITLC> = "True"
+def_rec<IX,DF_FONT_STYLE,DF_FONT_COLOR > = "0000FF00" ;* green
 SKIPRPT2:
 
 DEF_FILE = "SD_REPORTS"

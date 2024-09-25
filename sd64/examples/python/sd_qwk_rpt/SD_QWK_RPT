@@ -254,7 +254,7 @@ SCRIPT  = "from openpyxl import Workbook":LF
 SCRIPT := "from openpyxl.styles import PatternFill, Border, Side, Alignment, Protection, Font":LF
 SCRIPT := "wb = Workbook()":LF
 SCRIPT := WS_OBJ: " = wb.active":LF
-SCRIPT := WS_OBJ: '.title = "sheet1"':LF
+*  SCRIPT := WS_OBJ: '.title = "sheet1"':LF  <-- don't do this, title already sheet1
 
 $IFDEF EDB
   S_REC := SCRIPT
@@ -892,9 +892,9 @@ LOGMSG "SD_QWK_RPT: MVREPLACE TOKEN: "  :TOKEN
 $ENDIF
 *
 LOCATE TOKEN IN REPLACE_STRING<1,1> SETTING POS THEN
-  CELL_DATA = REPLACE_STRING<1,POS>
+  CELL_DATA = '"':REPLACE_STRING<2,POS>:'"'
 END ELSE
-   CELL_DATA = TOKEN:' not found'
+   CELL_DATA = '"':TOKEN:' not found"'
 END
 *
 GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,FMT_REC,PY_STATUS)
