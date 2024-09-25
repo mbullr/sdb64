@@ -71,21 +71,27 @@ def_rec<11,DF_ITEM_NAME> = "TITLE"
 def_rec<11,DF_CELL_REF> = "C2"
 def_rec<11,DF_DATA_TYPE> = "T"
 def_rec<11,DF_DATA_PARAM> = "My Customer Report"
-
+def_rec<11,DF_FONT_STYLE,DF_FONT_BOLD> = "True"
+def_rec<11,DF_FONT_STYLE,DF_FONT_SZ > = "20"
 *
 def_rec<12,DF_ITEM_NAME> = "QUERY1"
 def_rec<12,DF_CELL_REF> = "A5"
 def_rec<12,DF_DATA_TYPE> = "Q"
-def_rec<12,DF_DATA_PARAM> = '"CUSTOMERS","BY CM_NAME","WITH CM_STATUS =' : "'A'" : '"' : ',"CM_NAME CM_ADDR CM_PHONE"'
+def_rec<12,DF_DATA_PARAM> = '"CUSTOMERS","BY CM_NAME","WITH CM_CITY =' : "'MPLS'" : '"' : ',"CM_NAME CM_ADDR CM_PHONE"'
+def_rec<12,DF_FONT_STYLE,DF_FONT_COLOR > = "00FF0000" ;* red
 *
 def_rec<13,DF_ITEM_NAME> = "QC1"
 def_rec<13,DF_CELL_REF> = "B5"
 def_rec<13,DF_DATA_TYPE> = "QC"
+def_rec<13,DF_FONT_STYLE,DF_FONT_COLOR > = "0000FF00" ;* green
 *
 def_rec<14,DF_ITEM_NAME> = "QC2"
 def_rec<14,DF_CELL_REF> = "C5"
 def_rec<14,DF_DATA_TYPE> = "QC"
+def_rec<14,DF_FONT_STYLE,DF_FONT_COLOR > = "000000FF" ;* blue
 *
+GOTO SKIPRPT2
+
 def_rec<15,DF_ITEM_NAME> = "SHEET2"
 def_rec<15,DF_CELL_REF> = "A1"
 def_rec<15,DF_DATA_TYPE> = "W"
@@ -95,6 +101,8 @@ def_rec<16,DF_CELL_REF> = "C2"
 def_rec<16,DF_DATA_TYPE> = "T"
 def_rec<16,DF_DATA_PARAM> = "Customer By State Report"
 *
+
+
 def_rec<17,DF_ITEM_NAME> = "QUERY2"
 def_rec<17,DF_CELL_REF> = "A5"
 def_rec<17,DF_DATA_TYPE> = "Q"
@@ -107,7 +115,7 @@ def_rec<18,DF_DATA_TYPE> = "QC"
 def_rec<19,DF_ITEM_NAME> = "QC2"
 def_rec<19,DF_CELL_REF> = "C5"
 def_rec<19,DF_DATA_TYPE> = "QC"
-
+SKIPRPT2:
 
 DEF_FILE = "SD_REPORTS"
 DEF_FILE_ID = "CM_RPT"

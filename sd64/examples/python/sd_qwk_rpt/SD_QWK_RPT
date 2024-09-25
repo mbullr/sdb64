@@ -136,6 +136,11 @@ $DEFINE DF_CELL_FILL  7
 	$DEFINE DF_FILL_TYPE   4	
 $DEFINE DF_DATA_PARAM 8
 *
+* define the max number of columns we will allow 
+*  note: being lazy here, this just makes this example eaier to code, we allow columns to be labeled A-Z
+*    openpyxl will gladly accept more, we just are not doing it here. 
+*
+$DEFINE MAX_COLUMNS 26 
 ************************************************************************************************************************
 * START OF PROGRAM
 ************************************************************************************************************************
@@ -145,6 +150,12 @@ $DEFINE DF_DATA_PARAM 8
 * ARRAY TO HOLD DICTIONARY RECORDS
 *
 DIM DICTIONARY_DATA_ARRAY(10)
+*
+* ARRAY TO HOLD COLUMN FORMATS
+*
+DIM COL_FMT(MAX_COLUMNS)
+MAT COL_FMT = ""
+*
 *
 LF = CHAR(10)    ;* ALL IMPORTANT LINE FEED
 *
@@ -360,8 +371,10 @@ $ENDIF
 		 
       CASE  DATA_TYPE = "T"
          *  TEXT DATA TYPE, SIMPLY WRITE OUT TEXT
+		 GOSUB CREATE_FMT_STRING
+		 FMT_REC = FMT_STRING
          CELL_DATA = '"':DEF_LN_DATA<1,DF_DATA_PARAM>:'"'
-         GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,"",MY_STATUS)
+         GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,FMT_REC,MY_STATUS)
 
       CASE DATA_TYPE = "I"
 	     * image tbd
@@ -370,11 +383,16 @@ $ENDIF
       CASE DATA_TYPE = "Q"
 	     QUERY_START_ROW = CELL_ROW_NBR
          GOSUB PROCESS_SDQUERY
+         MAT COL_FMT = ""      ;* FLUSH ANY CREATED FORMATS 
  
       CASE DATA_TYPE = "L"    ;* IS THIS A LOOKUP?
+	     GOSUB CREATE_FMT_STRING
+		 FMT_REC = FMT_STRING
          GOSUB PROCESS_SDLOOKUP
       
       CASE DATA_TYPE = "R"   ;* IS THIS A REPLACE?
+	     GOSUB CREATE_FMT_STRING
+		 FMT_REC = FMT_STRING
          GOSUB PROCESS_SDREPLACE
              *
 
@@ -421,6 +439,14 @@ $ENDIF
 * DATA_FIELD_STR CONTAINS THE DICTIONARY NAMES OF THE DATA TO REPORT, BREAK'EM OUT
 DICT_NAMES = ''
 QUERY_COL_COUNT = DCOUNT(DATA_FIELD_STR," ")
+*
+* TOO MANY?
+IF QUERY_COL_COUNT > MAX_COLUMNS THEN
+    LOGMSG "SD_QWK_RPT: Exceeded Max Columns in Query"
+    MY_STATUS = 1 ;* RETURN AS ERROR TO CALLER
+	GOTO PQ.999  ;* EXIT ON ERROR
+END
+
 FOR FC = 1 TO QUERY_COL_COUNT
    DICT_NAMES<FC>  = FIELD(DATA_FIELD_STR," ",FC)
 $IFDEF EDB
@@ -500,6 +526,13 @@ FOR FC = 1 TO QUERY_COL_COUNT
   CELL_ADDR = QUERY_COLS<FC>
   GOSUB CELL_ADDRESS_TO_ROW_COL
   SCRIPT := ws_obj:'.column_dimensions["':CELL_COL_LTR:'"].width = ':width_val:LF
+*
+* NOW CREATE FORMAT SCRIPT STRING FOR THIS COLUMNS DATA Value
+*
+ DEF_LN_DATA = QUERY_DEF<FC>
+ GOSUB CREATE_FMT_STRING
+ COL_FMT(FC) = FMT_STRING 
+* 
 NEXT FC
 CALL !PY_RUNSTRING(SCRIPT,RTN)
 $IFDEF EDB
@@ -592,21 +625,26 @@ PROCESS_CSV_LN:
 * 
 DATAFIELDS = CSVDQ(DATALN)
 FIELD_CT = DCOUNT(DATAFIELDS,@FM)
+*
+IF FIELD_CT <> QUERY_COL_COUNT THEN
+    LOGMSG "SD_QWK_RPT: Expected Column Count: ":QUERY_COL_COUNT:" Got: ":FIELD_CT 
+	IF FIELD_CT > QUERY_COL_COUNT THEN 
+		FIELD_CT = QUERY_COL_COUNT  ;* PREVENT COL_FMT OVER INDEX
+	END
+END 
+*
 $IFDEF EDB
 LOGMSG "SD_QWK_RPT:  CSV Query Field Count: ":FIELD_CT
 $ENDIF
 
 FOR FI = 1 TO FIELD_CT
-   CELL_DATA = DATAFIELDS<FI>
-   DICT_REC  = DICTIONARY_DATA_ARRAY(FI)
-   IF FI > QUERY_COL_COUNT THEN
-      LOGMSG "SD_QWK_RPT:  Exceeded Expected Columns: ":QUERY_COL_COUNT:" CELL_DATA: ":CELL_DATA 
-   END ELSE
-      IF CELL_DATA # '' THEN
-         CELL_DATA = '"':CELL_DATA:'"'
-         GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<FI>,DICT_REC,PY_STATUS)
-      END
-   END	  
+	CELL_DATA = DATAFIELDS<FI>
+	FMT_REC  = COL_FMT(FI)
+	IF CELL_DATA # '' THEN
+		CELL_DATA = '"':CELL_DATA:'"'
+        GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<FI>,FMT_REC,PY_STATUS)
+	END
+	  
 NEXT FI
 LOC_ROW += 1  ;* NEXT SS ROW
 RETURN
@@ -687,11 +725,10 @@ FOR E = 1 TO ID_COUNT
       FOR DC = 1 TO DICT_COUNT
          *  get data based on type of dictionary item
          
-         DICT_REC = DICTIONARY_DATA_ARRAY(DC)
          BEGIN CASE
 
             CASE DICTIONARY_DATA_ARRAY(DC)<1> = "D"
-               *  D Type just pull and format, usless it points to field 0!
+               *  D Type just pull and format, useless it points to field 0!
                FLD_PTR = DICTIONARY_DATA_ARRAY(DC)<2>
                IF FLD_PTR = 0 THEN  ;* USE ID !
                   CELL_DATA = REC_ID
@@ -720,23 +757,23 @@ $ENDIF
                NEXT VCT
                CELL_DATA = TRIM(CELL_DATA,' ',"B")
 
-			   GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<DC>,DICT_REC,PY_STATUS)
+			   GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<DC>,COL_FMT(DC),PY_STATUS)
 
             CASE DICTIONARY_DATA_ARRAY(DC)<1> = "I" OR DICTIONARY_DATA_ARRAY(DC)<1> = "C"
                * I OR C TYPES NEED SYSTEMS HELP TO GET ACTUAL DATA
                @RECORD = DATA_REC
                CELL_DATA = ITYPE(DICTIONARY_DATA_ARRAY(DC))
-               GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<DC>,DICT_REC,PY_STATUS)
+               GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<DC>,COL_FMT(DC),PY_STATUS)
             CASE 1
                *   DICTIONARY TYPE THAT WE CURRENTLY DO NOT HANDLE, REPORT
                CELL_DATA = DICT_NAMES<DC>: ' Dict Type Not Currently Handled'
-               GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<DC>,DICT_REC,PY_STATUS)
+               GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<DC>,COL_FMT(DC),PY_STATUS)
          END CASE
       NEXT DC
       *
    END ELSE
       CELL_DATA = "Record: ":REC_ID: " Not Found In File: ":FILE_NAME
-      GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<DC>,DICT_REC,PY_STATUS)
+      GOSUB WRITECELL(LOC_ROW,CELL_DATA,QUERY_DEF<DC>,"",PY_STATUS)
    END
    *
    LOC_ROW += 1  ;* NEXT SS ROW
@@ -780,7 +817,7 @@ OPEN  FILE_NAME TO FILE_VAR THEN
          *
          FLD_OR_DICT = ABS(INT(FLD_OR_DICT))
          CELL_DATA = REC_DATA<FLD_OR_DICT,1,1>
-         GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,"",PY_STATUS)
+         GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,FMT_REC,PY_STATUS)
       END ELSE
          * DICTIONARY
          OPEN "DICT", FILE_NAME TO DICT_FILE_VAR THEN
@@ -788,7 +825,7 @@ OPEN  FILE_NAME TO FILE_VAR THEN
             READ DICTIONARY_DATA FROM DICT_FILE_VAR, FLD_OR_DICT THEN
                BEGIN CASE
                   CASE DICTIONARY_DATA<1> = "D"
-                     *  D Type just pull and format, usless it points to field 0!
+                     *  D Type just pull and format, useless it points to field 0!
                      FLD_PTR = DICTIONARY_DATA<2>
                      IF FLD_PTR = 0 THEN  ;* USE ID !
                         CELL_DATA = RECORD_ID
@@ -800,20 +837,20 @@ OPEN  FILE_NAME TO FILE_VAR THEN
                      IF FMT_CODE # '' THEN
                         CELL_DATA = OCONV(CELL_DATA,FMT_CODE)
                      END
-                     GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,DICTIONARY_DATA,PY_STATUS)
+                     GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,FMT_REC,PY_STATUS)
                   CASE DICTIONARY_DATA<1> = "I" OR DICTIONARY_DATA<1> = "C"
                      * I OR C TYPES NEED SYSTEMS HELP TO GET ACTUAL DATA
                      @RECORD = DATA_REC
                      CELL_DATA = ITYPE(DICTIONARY_DATA)
-                     GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,DICTIONARY_DATA,PY_STATUS)
+                     GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,FMT_REC,PY_STATUS)
                   CASE 1
                      *   DICTIONARY TYPE THAT WE CURRENTLY DO NOT HANDLE, REPORT
                      CELL_DATA = FLD_OR_DICT: ' Dict Type Not Currently Handled'
-                     GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,DICTIONARY_DATA,PY_STATUS)
+                     GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,"",PY_STATUS)
                END CASE
             END ELSE
                CELL_DATA = "Dictionary Item ":FLD_OR_DICT:" for ": FILE_NAME: " Not Found"
-               GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,DICTIONARY_DATA,PY_STATUS)
+               GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,"",PY_STATUS)
             END
 
             *
@@ -860,7 +897,7 @@ END ELSE
    CELL_DATA = TOKEN:' not found'
 END
 *
-GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,"",PY_STATUS)
+GOSUB WRITECELL(LOC_ROW,CELL_DATA,DEF_LN_DATA,FMT_REC,PY_STATUS)
 RETURN
 *-----------------------------------------------------------
 CELL_ADDRESS_TO_ROW_COL: *
@@ -932,13 +969,87 @@ GET_DICTS:
    END
 GET_DICT.999:  *   
 RETURN
+*
+*--------------------------------------------------------------
+* CREATE_FMT_STRING
+* ROUTINE TAKES FORMATING INFORMATION PASSED IN 
+* DEF_LN_DATA - CURRENT DEFINITION RECORD LN
+* AND RETURNS IN FMT_STRING
+*--------------------------------------------------------------
+CREATE_FMT_STRING:
+FMT_STRING = ''
+FONT_STR = ''
+MY_DEF_LN = RAISE(DEF_LN_DATA)
+
+* FONTS
+    * name=’Calibri’ 
+    * size=11 
+    * bold=False 
+    * italic=False 
+    * underline=’none’ 
+    * strike=False 
+    * color=’FF000000′ 
+
+IF My_DEF_LN<DF_FONT_STYLE> <> "" THEN
+* THERE IS SOMETHING HERE, PARSE IT
+    FONT_STR = 'cell.font = Font('
+	FONT_DEF = RAISE(MY_DEF_LN<DF_FONT_STYLE>) 
+*	
+	IF FONT_DEF<DF_FONT_NAME> <> "" THEN 
+	  FONT_STR := 'name="':FONT_DEF<DF_FONT_NAME>:'",'
+	END
+*	
+	IF FONT_DEF<DF_FONT_SZ> <> "" THEN
+		FONT_STR := ' size="':FONT_DEF<DF_FONT_SZ>:'",'
+	END
+*	
+	IF FONT_DEF<DF_FONT_BOLD> <> "" THEN
+		FONT_STR := ' bold="':FONT_DEF<DF_FONT_BOLD>:'",'
+	END	
+*	
+	IF FONT_DEF<DF_FONT_ITLC> <> "" THEN
+		FONT_STR := ' italic="':FONT_DEF<DF_FONT_ITLC>:'",'
+	END	
+*	
+	IF FONT_DEF<DF_FONT_UNLN> <> "" THEN
+		FONT_STR := ' underline="':FONT_DEF<DF_FONT_UNLN>:'",'
+	END		
+*	
+	IF FONT_DEF<DF_FONT_STKE> <> "" THEN
+		FONT_STR := ' strike="':FONT_DEF<DF_FONT_STKE>:'",'
+	END	
+*	
+	IF FONT_DEF<DF_FONT_COLOR> <> "" THEN
+		FONT_STR := ' color="':FONT_DEF<DF_FONT_COLOR>:'",'
+	END	
+*
+* remove trailing ',', ADD LF
+* 
+    FONT_STR = 	FONT_STR[1,LEN(FONT_STR)-1]
+    FONT_STR := ')':LF
+END
+
+FMT_STRING = FONT_STR
+$IFDEF EDB
+   LOGMSG "SD_QWK_RPT FMT_STRING: " : FMT_STRING
+$ENDIF
+
+CFS.999:
+RETURN
+*
 *--------------------------------------------------------------
 *
 * DEFINE SOME LOCAL SUBROUTINES
 *
 *--------------------------------------------------------------
 * WRITECELL
-LOCAL SUBROUTINE WRITECELL(L_ROW,CELL_DATA,DEF_LN_DATA,DICT_REC,PY_STATUS)
+LOCAL SUBROUTINE WRITECELL(L_ROW,CELL_DATA,DEF_LN_DATA,FMT_REC,PY_STATUS)
+*
+* L_ROW - SS ROW FOR THIS DATA Item
+* CELL_DATA - ACTUAL DATA Value
+* DEF_LN_DATA - REPORT DEFINITION FOR THIS DATA ITEM 
+* FMT_REC - PRE PARSED FORMAT SCRIPT STRING (VIA CREATE_FMT_STRING)
+* PY_STATUS - STATUS RETURNED FROM CALL TO PYTHON INTERPERTER 
 *
 CELL_DATA = TRIM(CELL_DATA)
 IF CELL_DATA # '' THEN
@@ -951,7 +1062,14 @@ IF CELL_DATA # '' THEN
    PY_STATUS = 0
    *
    * SEND TO openpyxl
-   SCRIPT = WS_OBJ:'["':ADDR_STR:'"] = ':CELL_DATA:LF
+   * SCRIPT = WS_OBJ:'["':ADDR_STR:'"] = ':CELL_DATA:LF
+   *
+   SCRIPT  = 'cell = ': WS_OBJ:'["':ADDR_STR:'"]':LF
+   SCRIPT := 'cell.value = ':CELL_DATA:LF
+   IF FMT_REC <> "" THEN
+     SCRIPT := FMT_REC
+   END
+   *
    CALL !PY_RUNSTRING(SCRIPT,RTN)
    IF RTN <> 0 THEN
      LOGMSG "SD_QWK_RPT: script failed: ":SCRIPT 
