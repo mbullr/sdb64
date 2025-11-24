@@ -1,3 +1,8 @@
+Experimental branch to add back built in telnet server, only over ssh tunnel.
+Work In Progress, may never add back in.
+Requres mods to GPL/LOGIN to fudge id to "sdsys" when reading ACCOUNTS file when logging in as root (sudo sd).
+
+
 SD, the Multivalue String Database
 
 SD is a multivalue database in the Pr1me Information tradition.  It contains open source code
