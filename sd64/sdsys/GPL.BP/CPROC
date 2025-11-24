@@ -263,6 +263,15 @@ restart.cproc:
       gosub reset.environment
 
       prompt ''
+      
+* rev 0.9-4 process login before dropping root user permissions      
+      i = '$LOGIN'
+      call @i(j,0)
+      if not(j) then goto abort.cproc
+      
+      
+      
+      
 * rev 0.9.0 entered as root?   
 * if we run as root, and the root umask is usually 022, that will not work for us
    
@@ -281,9 +290,9 @@ $endif
         void kernel(K$ADMINISTRATOR, 1)   ;* set admin bit
       end
       
-      i = '$LOGIN'
-      call @i(j,0)
-      if not(j) then goto abort.cproc
+*      i = '$LOGIN'
+*      call @i(j,0)
+*      if not(j) then goto abort.cproc
 
 
       

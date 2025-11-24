@@ -1,0 +1,9 @@
+[Unit]
+Description=sd Per-Connection Server
+
+[Socket]
+ListenStream=/tmp/sdsys/sdserver.socket
+Accept=true
+
+[Install]
+WantedBy=sockets.target

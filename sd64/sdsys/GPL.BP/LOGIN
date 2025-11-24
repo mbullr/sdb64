@@ -180,8 +180,48 @@ deffun is_grp_member(user,group) calling '!is_grp_member'
 *               BUT just to be safe, terminate if we get here as Network/serial connection
 
   if system(42) or system(1027) then   ;* Network/serial connection
-    logmsg sysmsg(5063, 'security test')  ;* Failed login authentication from %1
-    goto terminate.connection
+  * rev 0.9-4 allow connect via sdserver 
+    
+    logname = ''
+    i = pterm(PT$INVERT, @false)
+
+    for i = 1 to 3
+      for j = 1 to 3
+        display sysmsg(5015) :  ;* Username:
+        input lgn.id,50_ timeout 30 else
+          display sysmsg(5075)  ;* Timeout
+          goto terminate.connection
+        end
+        until lgn.id # ''
+      next j
+      if lgn.id = '' then return
+     
+      display sysmsg(5016) :  ;* Password:
+      input password,50_ hidden timeout 30 else
+        display sysmsg(5075)  ;* Timeout
+        goto terminate.connection
+      end
+      display
+
+      if lgn.id[1,1] # '$' then   ;* Names cannot start with $ 
+        if login(lgn.id, password) then
+          logname = lgn.id
+          exit
+        end
+      end
+
+     display sysmsg(5017) ;* Invalid username or password
+     sleep 3
+   next i
+
+   if logname = '' then   ;* Failed at all attempts
+     s = if system(42) then system(42) else system(1027)
+     logmsg sysmsg(5063, s)  ;* Failed login authentication from %1
+     goto terminate.connection
+   end
+   
+* not network connection *
+
   end else
      * This user has come in from a command prompt.
      lgn.id = @logname

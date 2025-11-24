@@ -1,0 +1,9 @@
+[Unit]
+Description=sd Per-Connection Server
+
+[Service]
+User=root
+Group=sdusers
+ExecStart=/usr/local/sdsys/bin/sd -n
+StandardInput=socket
+
