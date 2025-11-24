@@ -1,6 +1,27 @@
 Experimental branch to add back built in telnet server, only over ssh tunnel.
 Work In Progress, may never add back in.
+
 Requres mods to GPL/LOGIN to fudge id to "sdsys" when reading ACCOUNTS file when logging in as root (sudo sd).
+
+How to use.
+
+Install sd
+
+from client start ssh
+
+ssh -L 4246:/tmp/sdsys/sdserver.socket -N user@sd_serer
+
+where user - user defined on linux server "sd_server", must be a user allowed to use sd.
+
+from client telnet program (for example Putty)
+
+IP Address - 127.0.0.1
+
+Port       - 4246
+
+Connection Type - Telnet
+
+-------------------------------------------------------------------------------------------------
 
 
 SD, the Multivalue String Database
