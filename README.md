@@ -9,7 +9,7 @@ Install sd
 
 from client start ssh
 
-ssh -L 4246:/tmp/sdsys/sdserver.socket -N user@sd_serer
+ssh -L 4246:/tmp/sdsys/sdserver.socket -N user@sd_server
 
 where user - user defined on linux server "sd_server", must be a user allowed to use sd.
 
