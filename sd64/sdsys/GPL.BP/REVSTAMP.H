@@ -17,6 +17,7 @@
 * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 * 
 * START-HISTORY:
+* rev 1.0-2 see sdsys/changelog
 * rev 0.9-3 Nov 25 move voc back to dynamic file
 * rev 0.9-2 Mar 25 add sdpyobj function
 * rev 0.9.1 Mar 25 return to single rev track
@@ -37,8 +38,8 @@
 * Also edit VOC and NEWVOC record $RELEASE          
 $define MAJOR.REV      1
 $define MINOR.REV      0
-$define BUILD          1
-$define SD.REV.STAMP   "1.0-1"
+$define BUILD          2
+$define SD.REV.STAMP   "1.0-2"
 
 $define SD.COPYRIGHT.YEAR "2007"
 

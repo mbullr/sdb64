@@ -1,3 +1,8 @@
+Version 1.0-2
+-------------
+(mab)  Add back LISTPQ - sentence to list procs (SD.VOCLIB, VOC_TEMPLATE, NEWVOC)
+
+
 Version 1.0-1
 -------------
 (mab)  Add back basic statements PROCREAD and PROCWRITE. Changes to BCOMP, op_misc.c opcodes.h (both versions)
