@@ -19,14 +19,17 @@
  *               log local connections
  *               on local connection, set user / group id to user who forked process
  *               on connectlocal if account fails, disconnect!
- * rev 1.0-3 mab add some connection logging to syslog
- *               remove on local connection: set user / group id to user who forked process
+ * rev 1.0-3 mab Add some connection logging to syslog
+ *               Remove on local connection: set user / group id to user who forked process
  *                Not sure made any sense, local connect is forked from running sd process,
  *                   so by default it must be a valid user.
  *                Also causes Apache spawned process to fail, but doesn't if run from test c program ??
- *                Do not treat an SV_ERROR status code returned from APISRVR as a message_pair failure.
+ *              Do not treat an SV_ERROR status code returned from APISRVR as a message_pair failure.
  *                Most likely the original intent of message_pair returning false would be for this to indicate an actual communication error
- *                  between the sdclilib and APISRVR.
+ *                between the sdclilib and APISRVR.
+ *              Test memory allocations (malloc) for failure and abort if unsuccessful, current code would most like seqfault, use exit() instead
+ *              Add Err_Set Error Set Routine to report errors back to caller
+ *              SDCallx Correctly return sub name and arg count errors to caller
  *  Warning: sdclilib does not maintian a storage area for Getarg parameters for each session.
  *  Using Callx will "overwrite" the previous Callx parameters regardless of session number.
  *  A solution would be to add the return call buffers to the session structure....
@@ -138,6 +141,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/stat.h>
+#include <sysexits.h>
 /* rev 0.9.0 */
 #include <syslog.h>
 #include <pwd.h>
@@ -229,13 +233,14 @@ Private int       CallArgArraySz[MAX_ARGS];        /* and size of memory allocat
 
 
 #define MAX_SESSIONS 4
+#define MAX_sdErrLen 512
 Private struct {
   bool is_local;
   int16_t context;
 #define CX_DISCONNECTED 0 /* No session active */
 #define CX_CONNECTED 1    /* Session active but not... */
 #define CX_EXECUTING 2    /* ...executing command (implies connected) */
-  char sderror[512 + 1];
+  char sderror[MAX_sdErrLen + 1];
   int16_t server_error;
   int32_t sd_status;
   SOCKET sock;
@@ -265,6 +270,8 @@ Private char* read_record(int fno, char* id, int* err, int mode);
 Private void write_record(int16_t mode, int16_t fno, char* id, char* data);
 Private bool GetResponse(void);
 Private void Abort(char* msg, bool use_response);
+Private void Err_Set(char* msg, int sv_err, int sd_stat);
+Private void Err_Clr(void);
 Private char* memstr(char* str, char* substr, int str_len, int substr_len);
 Private bool match_template(char* string,
                             char* template,
@@ -278,7 +285,7 @@ Private char* sysdir(void);
 
 /* rev 0.9.0 */
 /* ======================================================================
-   SDCall()  - Callx catalogued subroutine
+   SDCallx()  - Callx catalogued subroutine
    Note, this version does NOT repopulate the returned values of the QMCallx calling arguments, you must use QMGetArg to retrive them */
 void DLLEntry SDCallx(char* subrname, int16_t argc, ...) {
   va_list ap;    /* variable arg list, see man va_list */
@@ -294,22 +301,26 @@ void DLLEntry SDCallx(char* subrname, int16_t argc, ...) {
   struct ARGDATA* argptr;
   int offset;
 
+  Err_Clr();
   if (context_error(CX_CONNECTED))
     return;
   subrname_len = strlen(subrname);
+// rev 1.0-3 correctly return sub name and arg count errors to caller
   if ((subrname_len < 1) || (subrname_len > MAX_CALL_NAME_LEN)) {
-    Abort("Illegal subroutine name in call", FALSE);
+    Err_Set("Illegal subroutine name in call", SV_ERROR,ER_BAD_NAME);
+    return;
   }
   if ((argc < 0) || (argc > MAX_ARGS)) {
-    Abort("Illegal argument count in call", FALSE);
+    Err_Set("Illegal argument count in call", SV_ERROR,ER_PARAMS);
+    return;
   }
  /* free up any memory allocated for prev callx arg strorage */
   for (i = 0; i < MAX_ARGS; i++) {
-	if (CallArgArray[i] != NULL ){
-	 free(CallArgArray[i]);
-	 CallArgArray[i] = NULL;
-	 CallArgArraySz[i] = 0;
-	}
+    if (CallArgArray[i] != NULL ){
+     free(CallArgArray[i]);
+     CallArgArray[i] = NULL;
+     CallArgArraySz[i] = 0;
+    }
   }
   /* Accumulate outgoing packet size */
   bytes = 2;                        /* Subrname length */
@@ -329,7 +340,8 @@ void DLLEntry SDCallx(char* subrname, int16_t argc, ...) {
     n = (bytes + BUFF_INCR - 1) & ~BUFF_INCR;
     q = (INBUFF*)malloc(n);
     if (q == NULL) {
-      Abort("Unable to allocate network buffer", FALSE);
+      Err_Set("Unable to allocate network buffer", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
     }
     free(buff);
     buff = q;
@@ -353,23 +365,24 @@ void DLLEntry SDCallx(char* subrname, int16_t argc, ...) {
     p += 4;
     if (arg_len)
       memcpy(p, arg, arg_len); /* Arg text */
-	p += (arg_len + 1) & ~1;
+    p += (arg_len + 1) & ~1;
   /* now save a copy                    */
-	arg_p = (char *)malloc((arg_len+1) * sizeof(char));   /* reserver mem for string and terminator */
-	/* if we fail to allocate memory, bomb out */
-	if (arg_p == NULL) {
-	   Abort("Unable to allocate Callx buffer", FALSE);
-	} else {
+    arg_p = (char *)malloc((arg_len+1) * sizeof(char));   /* reserver mem for string and terminator */
+    /* if we fail to allocate memory, bomb out */
+    if (arg_p == NULL) {
+       Err_Set("Unable to allocate Callx buffer", SV_ERROR,ER_MEM);
+       exit(EX_OSERR); // Halt the program gracefully 
+    } else {
    /* save ponter to allocated memory */
-	  CallArgArray[i-1] = arg_p;
-	  CallArgArraySz[i-1] = arg_len + 1;  /* along with the buffer size (string sz + terminator)    */
-	  if (arg_len == 0) {
-		*arg_p = '\0';
-	  } else {
+      CallArgArray[i-1] = arg_p;
+      CallArgArraySz[i-1] = arg_len + 1;  /* along with the buffer size (string sz + terminator)    */
+      if (arg_len == 0) {
+        *arg_p = '\0';
+      } else {
    /* copy arg to allocated memory, we are assuming arg is '\0' terminated, probably should check on this */
-		strcpy(arg_p,arg);
-	  }
-	}
+        strcpy(arg_p,arg);
+      }
+    }
   }
   va_end(ap);
   if (!message_pair(SrvrCall, (char*)buff, bytes)) {
@@ -379,38 +392,39 @@ void DLLEntry SDCallx(char* subrname, int16_t argc, ...) {
   offset = offsetof(INBUFF, data.call.argdata);
   if (offset < buff_bytes) {
     va_start(ap, argc);
-	for (i = 1; i <= argc; i++) {
+    for (i = 1; i <= argc; i++) {
       argptr = (ARGDATA*)(((char*)buff) + offset);
       arg = va_arg(ap, char*);
-	  if (i == argptr->argno) {
-		arg_len = LongInt(argptr->arglen);
-	   /*  memcpy(arg, argptr->text, arg_len);  */
-	   /*  arg[arg_len] = '\0';                 */
-	   /* check CallArgArray buffer is large enough for returned value */
-		if ((CallArgArraySz[i-1]) < (arg_len+1)) {
-	   /* not large enough, free and re allocate  */
-		  if (CallArgArray[i-1] != NULL)
-			 free(CallArgArray[i-1]);
-		  CallArgArray[i-1] = malloc((arg_len+1) * sizeof(char));
-		  if (CallArgArray[i-1] != NULL){
-			CallArgArraySz[i-1] = (arg_len+1) * sizeof(char);
-			memcpy(CallArgArray[i-1], argptr->text, arg_len);
-			CallArgArray[i-1][arg_len] = '\0';
-		  }else{
-			Abort("Unable to allocate Callx buffer on return", FALSE);
-		  }
-		}else{
-	  /* existing buffer large enough  */
-		  memcpy(CallArgArray[i-1], argptr->text, arg_len);
-		  CallArgArray[i-1][arg_len] = '\0';
-		}
+      if (i == argptr->argno) {
+        arg_len = LongInt(argptr->arglen);
+       /*  memcpy(arg, argptr->text, arg_len);  */
+       /*  arg[arg_len] = '\0';                 */
+       /* check CallArgArray buffer is large enough for returned value */
+        if ((CallArgArraySz[i-1]) < (arg_len+1)) {
+       /* not large enough, free and re allocate  */
+          if (CallArgArray[i-1] != NULL)
+             free(CallArgArray[i-1]);
+          CallArgArray[i-1] = malloc((arg_len+1) * sizeof(char));
+          if (CallArgArray[i-1] != NULL){
+            CallArgArraySz[i-1] = (arg_len+1) * sizeof(char);
+            memcpy(CallArgArray[i-1], argptr->text, arg_len);
+            CallArgArray[i-1][arg_len] = '\0';
+          }else{
+            Err_Set("Unable to allocate Callx buffer", SV_ERROR,ER_MEM);
+            exit(EX_OSERR); // Halt the program gracefully
+          }
+        }else{
+      /* existing buffer large enough  */
+          memcpy(CallArgArray[i-1], argptr->text, arg_len);
+          CallArgArray[i-1][arg_len] = '\0';
+        }
 
-		offset +=
+        offset +=
             offsetof(ARGDATA, text) + ((LongInt(argptr->arglen) + 1) & ~1);
         if (offset >= buff_bytes)
           break;
-	  }
-	}
+      }
+    }
     va_end(ap);
   }
 err:
@@ -433,21 +447,23 @@ char* DLLEntry SDGetArg(int ArgNbr) {
   int arg_idx;
   int arg_len;
   char* arg;
+  
+  Err_Clr();
   if ((ArgNbr < 1) || (ArgNbr > MAX_ARGS)) {
-	Abort("Illegal argument index in call", TRUE);
+    Err_Set("Illegal argument index in call", SV_ERROR,ER_INV_ARG);
     return NULL;
   }
   arg_idx = ArgNbr - 1;
   if ((CallArgArray[arg_idx] == NULL)) {
-	Abort("Argument value NULL", TRUE);
+    Err_Set("Argument value NULL", SV_ERROR,ER_INV_ARG);
     return NULL;
   }
   arg_len = strlen(CallArgArray[arg_idx]);
-  arg = (char *)malloc((arg_len+1) * sizeof(char));   /* reserver mem for string and terminator */
+  arg = (char *)malloc((arg_len+1) * sizeof(char));   /* reserve mem for string and terminator */
   /* if we fail to allocate memory, bomb out */
   if (arg == NULL) {
-	Abort("GetgArg Memory Allocation Failed", TRUE);
-    return NULL;
+    Err_Set("Unable to allocate Arg buffer", SV_ERROR,ER_MEM);
+    exit(EX_OSERR); // Halt the program gracefully
   }
   strcpy(arg,CallArgArray[arg_idx]);
   return arg;
@@ -477,11 +493,12 @@ void DLLEntry SDCall(char* subrname, int16_t argc, ...) {
 
   subrname_len = strlen(subrname);
   if ((subrname_len < 1) || (subrname_len > MAX_CALL_NAME_LEN)) {
-    Abort("Illegal subroutine name in call", FALSE);
+    Err_Set("Illegal subroutine name in call", SV_ERROR,ER_BAD_NAME);
+    return;
   }
-
   if ((argc < 0) || (argc > MAX_ARGS)) {
-    Abort("Illegal argument count in call", FALSE);
+    Err_Set("Illegal argument count in call", SV_ERROR,ER_PARAMS);
+    return;
   }
 
   /* Accumulate outgoing packet size */
@@ -506,7 +523,8 @@ void DLLEntry SDCall(char* subrname, int16_t argc, ...) {
     n = (bytes + BUFF_INCR - 1) & ~BUFF_INCR;
     q = (INBUFF*)malloc(n);
     if (q == NULL) {
-      Abort("Unable to allocate network buffer", FALSE);
+      Err_Set("Unable to allocate Call buffer", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
     }
     free(buff);
     buff = q;
@@ -647,7 +665,11 @@ SDChange(char* src, char* old, char* new, int occurrences, int start) {
   /* Now make the changes */
 
   new_str = (char*)malloc(src_len + changes * (new_len - old_len) + 1);
-
+// rev 1.0-3 test malloc for failure  
+  if (new_str == NULL) {
+      Err_Set("Unable to allocate buffer for SDChange", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   q = new_str;
   pos = src;
   bytes = src_len;
@@ -690,7 +712,12 @@ SDChange(char* src, char* old, char* new, int occurrences, int start) {
 
 return_unchanged:
   new_str = (char*)malloc(src_len + 1);
-  strcpy(new_str, src);
+// rev 1.0-3 test malloc for failure  
+  if (new_str == NULL) {
+      Err_Set("Unable to allocate buffer for SDChange", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
+  snprintf(new_str,src_len + 1,"%s", src);
   return new_str;
 }
 
@@ -767,7 +794,7 @@ SDConnect(char* host, int port, char* username, char* password, char* account) {
 
   n = strlen(host);
   if (n == 0) {
-    strcpy(session[session_idx].sderror, "Invalid host name");
+    snprintf(session[session_idx].sderror, MAX_sdErrLen,"%s", "Invalid host name");
     goto exit_sdconnect;
   }
 
@@ -777,7 +804,7 @@ SDConnect(char* host, int port, char* username, char* password, char* account) {
 
   n = strlen(username);
   if (n > MAX_USERNAME_LEN) {
-    strcpy(session[session_idx].sderror, "Invalid user name");
+    snprintf(session[session_idx].sderror, MAX_sdErrLen, "%s", "Invalid user name");
     goto exit_sdconnect;
   }
 
@@ -791,7 +818,7 @@ SDConnect(char* host, int port, char* username, char* password, char* account) {
 
   n = strlen(password);
   if (n > MAX_USERNAME_LEN) {
-    strcpy(session[session_idx].sderror, "Invalid password");
+    snprintf(session[session_idx].sderror, MAX_sdErrLen, "%s", "Invalid password");
     goto exit_sdconnect;
   }
 
@@ -1231,6 +1258,11 @@ done:
 
   new_len = src_len - bytes;
   new_str = malloc(new_len + 1);
+  // rev 1.0-3 test malloc for failure  
+  if (new_str == NULL) {
+      Err_Set("Unable to allocate buffer for SDDel", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   p = new_str;
 
   n = pos - src; /* Length of leading substring */
@@ -1253,7 +1285,12 @@ null_result:
 
 unchanged_result:
   new_str = malloc(src_len + 1);
-  strcpy(new_str, src);
+  // rev 1.0-3 test malloc for failure  
+  if (new_str == NULL) {
+      Err_Set("Unable to allocate buffer for SDDel", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
+  snprintf(new_str, src_len + 1, "%s", src);
   return new_str;
 }
 
@@ -1426,7 +1463,12 @@ char* DLLEntry SDExecute(char* cmnd, int* err) {
 
 exit_sdexecute:
   reply = malloc(reply_len + 1);
-  strcpy(reply, buff->data.execute.reply);
+  // rev 1.0-3 test malloc for failure  
+  if (reply == NULL) {
+      Err_Set("Unable to allocate buffer for SDExecute", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
+  snprintf(reply, reply_len + 1, "%s", buff->data.execute.reply);
   *err = session[session_idx].server_error;
 
   return reply;
@@ -1501,6 +1543,11 @@ char* DLLEntry SDExtract(char* src, int fno, int vno, int svno) {
 
 done:
   result = malloc(src_len + 1);
+  // rev 1.0-3 test malloc for failure  
+  if (result == NULL) {
+      Err_Set("Unable to allocate buffer for SDExtract", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   memcpy(result, src, src_len);
   result[src_len] = '\0';
   return result;
@@ -1566,6 +1613,11 @@ char* DLLEntry SDField(char* src, char* delim, int first, int occurrences) {
 
   result_len = p - pos;
   result = malloc(result_len + 1);
+  // rev 1.0-3 test malloc for failure  
+  if (result == NULL) {
+      Err_Set("Unable to allocate buffer for SDField", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   memcpy(result, pos, result_len);
   result[result_len] = '\0';
   return result;
@@ -1707,6 +1759,11 @@ done:
 
   new_len = src_len + fm + vm + sm + ins_len + (postmark != '\0');
   new_str = malloc(new_len + 1);
+  // rev 1.0-3 test malloc for failure  
+  if (new_str == NULL) {
+      Err_Set("Unable to allocate buffer for SDIns", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   p = new_str;
 
   if (n) {
@@ -2056,6 +2113,11 @@ char* DLLEntry SDMatchfield(char* str, char* pattern, int component) {
         *(component_end) = '\0';
       n = strlen(component_start);
       result = malloc(n + 1);
+      // rev 1.0-3 test malloc for failure  
+      if (result == NULL) {
+        Err_Set("Unable to allocate buffer for SDMatchField", SV_ERROR,ER_MEM);
+        exit(EX_OSERR); // Halt the program gracefully
+      }
       memcpy(result, component_start, n);
       result[n] = '\0';
       return result;
@@ -2149,6 +2211,11 @@ char* DLLEntry SDReadList(int listno) {
 exit_sdreadlist:
 
   list = malloc(data_len + 1);
+  // rev 1.0-3 test malloc for failure  
+  if (list == NULL) {
+      Err_Set("Unable to allocate buffer for SDReadList", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   memcpy(list, buff->data.readlist.list, data_len);
   list[data_len] = '\0';
   return list;
@@ -2188,6 +2255,11 @@ char* DLLEntry SDReadNext(int16_t listno) {
 
 exit_sdreadnext:
   id = malloc(id_len + 1);
+  // rev 1.0-3 test malloc for failure  
+  if (id == NULL) {
+      Err_Set("Unable to allocate buffer for SDReadNext", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   memcpy(id, buff->data.readnext.id, id_len);
   id[id_len] = '\0';
   return id;
@@ -2449,6 +2521,11 @@ done:
 
   new_len = src_len - bytes + fm + vm + sm + ins_len;
   new_str = malloc(new_len + 1);
+  // rev 1.0-3 test malloc for failure  
+  if (new_str == NULL) {
+      Err_Set("Unable to allocate buffer for SDReplace", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   p = new_str;
 
   n = pos - src; /* Length of leading substring */
@@ -2513,6 +2590,11 @@ char* DLLEntry SDRespond(char* response, int* err) {
 
 exit_sdrespond:
   reply = malloc(reply_len + 1);
+  // rev 1.0-3 test malloc for failure  
+  if (reply == NULL) {
+      Err_Set("Unable to allocate buffer for SDRespond", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   memcpy(reply, buff->data.execute.reply, reply_len);
   reply[reply_len] = '\0';
   *err = session[session_idx].server_error;
@@ -2665,6 +2747,11 @@ Private char* SelectLeftRight(int16_t fno,
   }
 
   key = malloc(key_len + 1);
+  // rev 1.0-3 test malloc for failure  
+  if (key == NULL) {
+      Err_Set("Unable to allocate buffer for SDSelectLR", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   memcpy(key, buff->data.selectleft.key, key_len);
   key[key_len] = '\0';
   return key;
@@ -2898,6 +2985,11 @@ Private char* read_record(int fno, char* id, int* err, int mode) {
 
 exit_read:
   rec = malloc(rec_len + 1);
+  // rev 1.0-3 test malloc for failure  
+  if (rec == NULL) {
+      Err_Set("Unable to allocate buffer for SDRead", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   memcpy(rec, buff->data.read.rec, rec_len);
   rec[rec_len] = '\0';
   *err = status;
@@ -2947,9 +3039,8 @@ Private void write_record(int16_t mode, int16_t fno, char* id, char* data) {
     bytes = (bytes + BUFF_INCR - 1) & ~BUFF_INCR;
     q = (INBUFF*)malloc(bytes);
     if (q == NULL) {
-      Abort("Insufficient memory", FALSE);
-      session[session_idx].sd_status = ER_SRVRMEM;
-      goto exit_write;
+      Err_Set("Unable to allocate buffer for SDWrite", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
     }
     free(buff);
     buff = q;
@@ -2995,10 +3086,10 @@ Private bool GetResponse() {
   if (session[session_idx].server_error == SV_ERROR) {
     // save original error code
     old_status = session[session_idx].sd_status;
-    strcpy(session[session_idx].sderror, "Unable to retrieve error text");
+    snprintf(session[session_idx].sderror, MAX_sdErrLen, "%s", "Unable to retrieve error text");
     write_packet(SrvrGetError, NULL, 0);
     if (read_packet()){
-      strcpy(session[session_idx].sderror, buff->data.error.text);
+      snprintf(session[session_idx].sderror, MAX_sdErrLen, "%s", buff->data.error.text);
       // restore original SV_ERROR
       session[session_idx].server_error = SV_ERROR;
       session[session_idx].sd_status = old_status;
@@ -3010,13 +3101,38 @@ Private bool GetResponse() {
   return TRUE;
 }
 /* ====================================================================== */
+/* rev 1.0-3 Error Set
+ * Routine sets  session sderror, server_error, sd_status
+ */
+Private void Err_Set(char* msg, int sv_err, int sd_stat){
+    snprintf(session[session_idx].sderror, MAX_sdErrLen, "%s", msg);
+    session[session_idx].server_error = sv_err;
+    session[session_idx].sd_status = sd_stat;
+    Abort(msg, FALSE);
+return;
+}
+/* ====================================================================== */
+/* rev 1.0-3 Error Clear
+ * Routine clears session sderror, server_error, sd_status
+ */
+Private void Err_Clr(void){
+    session[session_idx].sderror[0] = '\0';
+    session[session_idx].server_error = SV_OK;
+    session[session_idx].sd_status = SV_OK;
+return;
+}
 
+/* ====================================================================== */
+/* if use_response pull message from INBUFF (assume it is from APISRVR  
+   otherwise use passed message]
+*/
 Private void Abort(char* msg, bool use_response) {
-  char abort_msg[1024 + 1];
+  #define abort_msg_sz 1025
+  char abort_msg[abort_msg_sz];
   int n;
   char* p;
 
-  strcpy(abort_msg, msg);
+  snprintf(abort_msg, abort_msg_sz, "%s", msg);
 
   if (use_response) {
     n = buff_bytes - offsetof(INBUFF, data.abort.message);
@@ -3416,6 +3532,11 @@ Private char* NullString() {
   char* p;
 
   p = malloc(1);
+  // rev 1.0-3 test malloc for failure  
+  if (p == NULL) {
+      Err_Set("Unable to allocate buffer for NullString", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   *p = '\0';
   return p;
 }
@@ -3617,8 +3738,11 @@ Private bool read_packet() {
     free(buff);
     n = (packet_bytes + BUFF_INCR) & ~(BUFF_INCR - 1);
     buff = (INBUFF*)malloc(n);
-    if (buff == NULL)
-      return FALSE;
+    if (buff == NULL){
+      Err_Set("Unable to allocate buffer for readpacket", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+      //return FALSE;
+    }
     buff_size = n;
 
     if (srvr_debug != NULL) {
@@ -3745,20 +3869,23 @@ Private void debug(unsigned char* p, int n) {
 Private char* sysdir() {
   static char sysdirpath[MAX_PATHNAME_LEN + 1] = "";
   char inipath[MAX_PATHNAME_LEN + 1];
-  char section[50];
-  char rec[200 + 1];
+  #define section_sz 50
+  char section[section_sz];
+  #define rec_sz  201
+  char rec[rec_sz];
   FILE* fu;
   char* p;
  /* 20240219 mab correct env name */
   p = getenv("SD_CONFIG");  /* was QMCONFIG */ /* Issue #29 */
   if (p != NULL)
-    strcpy(inipath, p);
+    snprintf(inipath,sizeof(inipath), "%s", p);
   else
-    strcpy(inipath, "/etc/sd.conf"); // was sdconfig
+      
+    snprintf(inipath, sizeof(inipath), "%s" , "/etc/sd.conf"); // was sdconfig
 
   fu = fopen(inipath, FOPEN_READ_MODE);
   if (fu == NULL) {
-    sprintf(session[session_idx].sderror, "%s not found", inipath);
+    snprintf(session[session_idx].sderror, sizeof(session[0].sderror), "%s not found",inipath);
     return NULL;
   }
 
@@ -3773,7 +3900,7 @@ Private char* sysdir() {
     if (rec[0] == '[') {
       if ((p = strchr(rec, ']')) != NULL)
         *p = '\0';
-      strcpy(section, rec + 1);
+      snprintf(section, section_sz, "%s", rec + 1);
 
       for (p = section; *p != '\0'; p++)
         *p = UpperCase(*p);
@@ -3783,7 +3910,7 @@ Private char* sysdir() {
     if (strcmp(section, "SD") == 0) /* [sd] items */
     {
       if (strncmp(rec, "SDSYS=", 6) == 0) {
-        strcpy(sysdirpath, rec + 6);
+        snprintf(sysdirpath, MAX_PATHNAME_LEN + 1, "%s", rec + 6);
         break;
       }
     }
@@ -3792,8 +3919,7 @@ Private char* sysdir() {
   fclose(fu);
 
   if (sysdirpath[0] == '\0') {
-    sprintf(session[session_idx].sderror,
-            "No SDSYS parameter in configuration file");
+    snprintf(session[session_idx].sderror, sizeof(session[0].sderror), "No SDSYS parameter in configuration file");
     return NULL;
   }
 
@@ -3810,6 +3936,11 @@ Private void initialise_client() {
 
     buff_size = 2048;
     buff = (INBUFF*)malloc(buff_size);
+    // rev 1.0-3 test malloc for failure  
+    if (buff == NULL) {
+      Err_Set("Unable to allocate buffer for initialise_client", SV_ERROR,ER_MEM);
+      exit(EX_OSERR); // Halt the program gracefully
+    }
 
     for (i = 0; i < MAX_SESSIONS; i++) {
       session[i].context = CX_DISCONNECTED;
@@ -3822,10 +3953,10 @@ Private void initialise_client() {
       session[i].TxPipe[1] = -1;
     }
     /* rev 0.9.0  initialize the arg pointer array for Callx */
-	  for (i = 0; i < MAX_ARGS; i++) {
-	    CallArgArray[i] = NULL;
-	    CallArgArraySz[i] = 0;
-	  }
+      for (i = 0; i < MAX_ARGS; i++) {
+        CallArgArray[i] = NULL;
+        CallArgArraySz[i] = 0;
+      }
   }
 }
 
@@ -3843,7 +3974,7 @@ Private bool FindFreeSession() {
 
   if (i == MAX_SESSIONS) {
     /* Must return error via a currently connected session */
-    strcpy(session[session_idx].sderror, "Too many sessions");
+    snprintf(session[session_idx].sderror, sizeof(session[0].sderror), "%s", "Too many sessions");
     return FALSE;
   }
 
@@ -3884,28 +4015,28 @@ Private void  disconnect() {
 
  /* rev 0.9.0 
   I cannot find where the original transfer buffer "buff" is freed on exit
-	So look for connected session, if none, release buffer                */
+    So look for connected session, if none, release buffer                */
 
   for (i = 0; i < MAX_SESSIONS; i++) {
-	  if (session[i].context == CX_CONNECTED)
-	    break;
+      if (session[i].context == CX_CONNECTED)
+        break;
   }
 
   if (i == MAX_SESSIONS) {
-	/* looked at all the sessions and none connected free buff */
-	  if (buff != NULL) {
-	    free(buff);
-	    buff = NULL;
-	  }
+    /* looked at all the sessions and none connected free buff */
+      if (buff != NULL) {
+        free(buff);
+        buff = NULL;
+      }
 
    /* free the callx arg buffers if they are still around */
    /* this needs modifing if we go with more than 1 session, see comments at top */
-	  for (i = 0; i < MAX_ARGS; i++) {
-	    if (CallArgArray[i] != NULL ){
-		    free(CallArgArray[i]);
-		    CallArgArray[i] = NULL;
-		    CallArgArraySz[i] = 0;
-	    }
+      for (i = 0; i < MAX_ARGS; i++) {
+        if (CallArgArray[i] != NULL ){
+            free(CallArgArray[i]);
+            CallArgArray[i] = NULL;
+            CallArgArraySz[i] = 0;
+        }
     }
 
   }

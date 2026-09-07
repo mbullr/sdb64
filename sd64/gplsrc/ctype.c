@@ -18,6 +18,7 @@
  * 
  * START-HISTORY 
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3 use safe_malloc 
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -40,6 +41,8 @@
  */
 
 #include "sd.h"
+// rev 1.0-3 for safe_malloc
+#include <sysexits.h>
 
 Private char* CNullString(void);
 
@@ -265,7 +268,12 @@ char* Extract(char* src, int fno, int vno, int svno) {
     src_len = p - src; /* Adjust to ignore later fields */
 
 done:
+// rev 1.0-3 test malloc  
   result = malloc(src_len + 1);
+  if (result == NULL) {
+      fprintf(stderr, "Fatal: Out of memory trying to allocate %d bytes.\n", src_len);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   memcpy(result, src, src_len);
   result[src_len] = '\0';
   return result;
@@ -277,8 +285,12 @@ null_result:
 
 Private char* CNullString() {
   char* p;
-
+// rev 1.0=3 use safe_malloc
   p = malloc(1);
+  if (p == NULL) {
+      fprintf(stderr, "Fatal: Out of memory trying to allocate CNullString.\n");
+      exit(EX_OSERR); // Halt the program gracefully
+  }
   *p = '\0';
   return p;
 }

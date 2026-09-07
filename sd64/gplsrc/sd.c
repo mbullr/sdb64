@@ -22,6 +22,7 @@
  * 02 Jul 24 -i  typeo will hit bootstrap option
  * 08 Aug 24 mab add code to embedded python if EMBED_PYTHON defined 
  * rev 0.9.1 Mar 25 return to single rev track 
+ * rev 1.0-3 add safe_malloc and ksafe_malloc
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -73,6 +74,8 @@
 #include <stdarg.h>
 /* 20240126 mab add syslog */
 #include <syslog.h>
+// rev 1.0-3 for safe_malloc
+#include <sysexits.h>
 
 // #define DEBUG /* enables harcoded diagnostic output */
 
@@ -601,5 +604,32 @@ Private bool load_pcode(char *pname, u_char **ptr) {
   fprintf(stderr, "Pcode item %s not found\n", u_pname);
   return FALSE;
 }
-
+/* rev 1.0-3 safe memory allocation
+      this function added to replace malloc not protected by allocation failure checking
+      intent is to us this in place of malloc where test for returned null pointer is not performed
+*/      
+void *safe_malloc(size_t size) {
+  void *ptr = malloc(size);
+  if (ptr == NULL && size > 0) {
+      fprintf(stderr, "Fatal: Out of memory trying to allocate %zu bytes.\n", size);
+      exit(EX_OSERR); // Halt the program gracefully
+  }
+  return ptr;
+}
+/* rev 1.0-3 ksafe memory allocation
+      this function added to replace k_alloc (malloc) not protected by allocation failure checking
+      intent is to us this in place of k_alloc where test for returned null pointer is not performed
+*/
+void *ksafe_malloc(size_t size) {
+  #define msgsz 256
+  char msg[msgsz];  
+  void *ptr = malloc(size);
+  if (ptr == NULL && size > 0) {
+      snprintf(msg,msgsz,"Fatal: Out of memory trying to allocate %zu bytes.\n", size);
+      k_error(msg);
+      // we should never actually come back from k_error, just in case exit with os error
+      exit(EX_OSERR); // Halt the program gracefully
+  }
+  return ptr;
+}
 /* END-CODE */

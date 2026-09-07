@@ -22,7 +22,7 @@
  * 30 Jul 24 mab add error codes for SD_ENCRYPT_SODIUM
  * rev 0.9.0 Jan 25 mab sdext_eguid_set error codes
  * rev 0.9-2 Mar 25 mab add sdext_pyobj direct control of python dictionary object
- * 1.0-3 mab add 4100 Undefined Server Error, 4101 invalid file number
+ * 1.0-3 mab add 4100 Undefined Server Error, 4101 invalid file number, 4102 invalid arg
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -154,6 +154,7 @@
 #define ER_SRVRMEM     4000    /* Insufficient memory for packet buffer */
 #define ER_SRVRERR     4100    /* Undefined Server Error */
 #define ER_INV_NBR     4101    /* Invalid File Number */
+#define ER_INV_ARG     4102    /* Invalid Argument */
 
 /* 5000 - 5999   Operating system related issues */
 #define ER_NO_DLL      5000    /* DLL not found */

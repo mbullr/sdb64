@@ -18,6 +18,7 @@
  * 
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3 start_sd()` treats a failed `fork()` as success, and the daemon dies silently
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -349,6 +350,14 @@ bool start_sd() {
 
   sysseg->sdlnxd_pid = -1; /* Stays -ve if fails to start */
   cpid = fork();
+  // rev 1.0-3 start_sd() treats a failed fork() as success, and the daemon dies silently
+  if (cpid < 0) {
+    fprintf(stderr, "Cannot start sd - fork() failed: %s\n", 
+            strerror(errno));
+    fprintf(stderr, "Run sd -stop to clear what this left behind.\n");
+    return FALSE;
+  }
+  
   if (cpid == 0) { /* Child process */
     for (i = 3; i < 1024; i++)
       close(i);

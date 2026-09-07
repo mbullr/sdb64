@@ -22,6 +22,8 @@
  * 08 Aug 2024 mab add embedded python
  * rev 0.9.0 Jan 25 mab add sdext_eguid_set set / restore euid egid of process
  * rev 0.9-2 Mar 25 mab mods for sdext_pyobj
+ * rev 1.0-3 use safe_malloc
+ * 
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -87,8 +89,8 @@ estack> +    next available descr     ++    next available descr     +
         +=============================++
         + Addr to descriptor for Arg  ++   
         +=============================++
-		
-	   patterned from op_ospath() in op_dio2.c */
+        
+       patterned from op_ospath() in op_dio2.c */
 
 void op_sdext() {
 
@@ -129,10 +131,10 @@ void op_sdext() {
   str = descr->data.str.saddr;
   /* is there something there? */
   if (str == NULL){
-	  myval_len = 0;  
+      myval_len = 0;  
     mybuf_sz = 1;              /* room for string terminator */
   }else{
-	 myval_len =  str->string_len;
+     myval_len =  str->string_len;
      mybuf_sz  =  myval_len+1; /* room for string terminator */
   }
   
@@ -140,14 +142,14 @@ void op_sdext() {
   myval_buffer = malloc(mybuf_sz * sizeof(char));
   if (myval_buffer == NULL){
    /* so here is a question, what to do if we cannot allocate memory?
-	  We will end execution of program and attempt to report error  */
+      We will end execution of program and attempt to report error  */
      k_error(sysmsg(10005));   /* Insufficient memory for buffer allocation */
-	 /* We never come back from k_error */
+     /* We never come back from k_error */
   }
 
   /* move the passed argument string to our buffer */
   if (myval_len == 0){
-	  myval_buffer[0] = '\0';
+      myval_buffer[0] = '\0';
   } else {
    /* rem string length returned by k_get_c_string excludes terminator in count!*/ 
       myval_len = k_get_c_string(descr, myval_buffer, myval_len);
@@ -163,41 +165,41 @@ void op_sdext() {
 /* now extract arguments from the past arg string */
 
   if (myval_len == 0) {
-	  argCnt = 1;                       /* always one args */
-	  SDMEArgArray[0] = NullString();   /* simply a null string */
+      argCnt = 1;                       /* always one args */
+      SDMEArgArray[0] = NullString();   /* simply a null string */
 
   }else{ 
 
     if (IsArgMV != 0){             /* MV Arg set */
   /*  Get number of fields in ARG */
       argCnt = Dcount(myval_buffer, myFM);
-	/* if we found more args than we can process, only extract what we can hold */
-	    if (argCnt > SD_MAX_ARGS) {
-		    argCnt = SD_MAX_ARGS;
+    /* if we found more args than we can process, only extract what we can hold */
+        if (argCnt > SD_MAX_ARGS) {
+            argCnt = SD_MAX_ARGS;
       }
-	
-	    for (argIdx = 0; argIdx < argCnt; argIdx++) { 
+    
+        for (argIdx = 0; argIdx < argCnt; argIdx++) { 
         /* rem Extract allocates our buffer space */
-	      SDMEArgArray[argIdx]	= Extract(myval_buffer, argIdx+1, 0, 0);
-	    }
+          SDMEArgArray[argIdx]  = Extract(myval_buffer, argIdx+1, 0, 0);
+        }
     } else {  /* MV Flag not set, */
         argCnt = 1;                       /* always one args */
         SDMEArgArray[0] = myval_buffer;   /* we just point to the value buffer created earlier */  
     }
-  }	  
+  }   
   
   switch (key) {
-	  
-	  case  SDEXT_TestIt: 
-	/* simple test to see if any of this works, output args to stdout  */
-	    for (argIdx = 0; argIdx < argCnt; argIdx++) {
-	      printf("Arg %d of %d\r\n",argIdx+1, argCnt);
- 	      printf("'%s'\r\n",SDMEArgArray[argIdx]);
-	    }
+      
+      case  SDEXT_TestIt: 
+    /* simple test to see if any of this works, output args to stdout  */
+        for (argIdx = 0; argIdx < argCnt; argIdx++) {
+          printf("Arg %d of %d\r\n",argIdx+1, argCnt);
+          printf("'%s'\r\n",SDMEArgArray[argIdx]);
+        }
       snprintf( myErrMsg, SD_ERR_MSG_LEN, "op_sdext() found %d args\n", argCnt);
       k_put_c_string(myErrMsg, e_stack);   /* sets as descr as type string and place the value in myErrMsg into it */
                                            /* this will then get transferred to RTNVAL via */
-      e_stack++;	
+      e_stack++;    
       break; 
 
     case SD_SALT:
@@ -208,7 +210,7 @@ void op_sdext() {
                                            /* this will then get transferred to RTNVAL */
         e_stack++;
         free(mysalt);
-      }	else {
+      } else {
         sdme_err_rsp(SD_Mem_Err);          /* only possible error in sd_salt ? */
       }
       break; 
@@ -228,7 +230,7 @@ void op_sdext() {
                                            /* this will then get transferred to RTNVAL */
         e_stack++;
         sodium_free(mykey);                /* key buffer was allocated via sodium_malloc, free via sodium_free*/
-      }	else {
+      } else {
         sdme_err_rsp(process.status);      /* eror set in process.status */
       }
       break;
@@ -261,15 +263,15 @@ void op_sdext() {
   
   /* release our arg Buffers  */
   for (argIdx = 0; argIdx < SD_MAX_ARGS; argIdx++) {
-	  if (SDMEArgArray[argIdx] != NULL ){
-	    free(SDMEArgArray[argIdx]);
-	    SDMEArgArray[argIdx] = NULL;
-	  }
+      if (SDMEArgArray[argIdx] != NULL ){
+        free(SDMEArgArray[argIdx]);
+        SDMEArgArray[argIdx] = NULL;
+      }
   }  
-  /* and the val buffer */	
+  /* and the val buffer */  
   if (myval_buffer != NULL){
     if (IsArgMV != 0) {      /* rem if IsArgMV not set, we pointed DMEArgArray[0] to myval_buffer*/
-	    free(myval_buffer);    /* do not want to attempt to free the memory again!!*/
+        free(myval_buffer);    /* do not want to attempt to free the memory again!!*/
     } 
   } 
 
@@ -278,8 +280,8 @@ void op_sdext() {
 
 char* NullString() {
   char* p;
-
-  p = malloc(1);
+  // rev 1.0-3 use safe_malloc
+  p = safe_malloc(1);
   *p = '\0';
   return p;
 }

@@ -18,6 +18,7 @@
  * 
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3 op_trimx had int variable skip_count defined as bool
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -1089,7 +1090,7 @@ void op_trimx() {
   int16_t src_bytes_remaining; /* Remaining bytes in this chunk */
 
   bool front_of_string;
-  bool skip_count;
+  int32_t  skip_count; /* rev 1.0-3 was bool */
 
   bool skip_leading;
   bool skip_trailing;

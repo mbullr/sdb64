@@ -27,6 +27,7 @@
 * rev 1.0-3 mab Use logmsg for debug logging, add log command and status results
 *               Reformat code and change vb. labels to api.
 *               Add ER$INV.NBR
+*               propagate sub set status code back to caller (API.CALL)
 * END-HISTORY
 *
 *
@@ -812,6 +813,8 @@ api.call:
          pos += arg.len + bitand(arg.len, 1)
       next i
       callv @subr.name, arg.count, args
+      * rev 1.0-3 save status code from sub
+      sav.stat = status()
       * Now return values of changed arguments (if any)
       for i = 1 to arg.count
          if changed(args(i)) then
@@ -822,7 +825,10 @@ api.call:
    end else
       call @subr.name
    end
+   * rev 1.0-3 reset.env can leave a Item not found status code from delete.common
+   *           if we what the chance of passing sub set status code we must save and restore
    gosub reset.environment
+   set.status sav.stat
    return
 
 * ======================================================================

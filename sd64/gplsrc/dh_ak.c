@@ -1314,8 +1314,8 @@ Private void akscan(bool right) {
   }
 
   /* Read the node buffer */
-
-  node = (AKBUFF *)k_alloc(104, sizeof(AKBUFF));
+  // rev 1.0-3 use ksafe_alloc
+  node = (AKBUFF *)ksafe_alloc(104, sizeof(AKBUFF));
   if (!dh_read_group(dh_file, subfile, ak_node_num, node->buff, DH_AK_NODE_SIZE)) {
     goto exit_akscan;
   }
@@ -2070,8 +2070,8 @@ Private bool ak_write(DH_FILE *dh_file, /* File descriptor */
 
   do {
     /* Allocate a new buffer area */
-
-    node_ptr = (NODE *)k_alloc(43, sizeof(struct NODE));
+    // rev 1.0-3 use ksafe_alloc
+    node_ptr = (NODE *)ksafe_alloc(43, sizeof(struct NODE));
     node_ptr->prev = tail;
     tail = node_ptr;
     tail->node_num = node_num;
@@ -2278,7 +2278,8 @@ Private bool ak_write(DH_FILE *dh_file, /* File descriptor */
   /* Create leftmost new node */
 
   new_node1_num = get_ak_node(dh_file, subfile);
-  new_node1 = (DH_TERM_NODE *)k_alloc(50, DH_AK_NODE_SIZE);
+  // rev 1.0-3 use ksafe_alloc
+  new_node1 = (DH_TERM_NODE *)ksafe_alloc(50, DH_AK_NODE_SIZE);
   memset((char *)new_node1, '\0', DH_AK_NODE_SIZE);
   new_node1->node_type = AK_TERM_NODE;
 
@@ -2299,7 +2300,8 @@ Private bool ak_write(DH_FILE *dh_file, /* File descriptor */
   /* Create new node to right */
 
   new_node2_num = get_ak_node(dh_file, subfile);
-  new_node2 = (DH_TERM_NODE *)k_alloc(50, DH_AK_NODE_SIZE);
+  // rev 1.0-3 use ksafe_alloc  
+  new_node2 = (DH_TERM_NODE *)ksafe_alloc(50, DH_AK_NODE_SIZE);
   memset((char *)new_node2, '\0', DH_AK_NODE_SIZE);
   new_node2->node_type = AK_TERM_NODE;
   new_node2->used_bytes = TERM_NODE_HEADER_SIZE;
@@ -2427,7 +2429,8 @@ Private bool ak_write(DH_FILE *dh_file, /* File descriptor */
 
   if (rec_offset < used_bytes) {
     new_node3_num = get_ak_node(dh_file, subfile);
-    new_node3 = (DH_TERM_NODE *)k_alloc(50, DH_AK_NODE_SIZE);
+    // rev 1.0-3 use ksafe_alloc    
+    new_node3 = (DH_TERM_NODE *)ksafe_alloc(50, DH_AK_NODE_SIZE);
     memset((char *)new_node3, '\0', DH_AK_NODE_SIZE);
     new_node3->node_type = AK_TERM_NODE;
     new_node3->used_bytes = TERM_NODE_HEADER_SIZE;
@@ -2476,7 +2479,8 @@ Private bool ak_write(DH_FILE *dh_file, /* File descriptor */
 
   if (new_node1->left) {
     if (link_node == NULL) {
-      link_node = (DH_TERM_NODE *)k_alloc(50, DH_AK_NODE_SIZE);
+    // rev 1.0-3 use ksafe_alloc        
+      link_node = (DH_TERM_NODE *)ksafe_alloc(50, DH_AK_NODE_SIZE);
     }
 
     if (!dh_read_group(dh_file, subfile, GetAKFwdLink(dh_file, new_node1->left), (char *)link_node, DH_AK_NODE_SIZE)) {
@@ -2515,7 +2519,8 @@ Private bool ak_write(DH_FILE *dh_file, /* File descriptor */
 
   if (link_node_ptr->right) {
     if (link_node == NULL) {
-      link_node = (DH_TERM_NODE *)k_alloc(50, DH_AK_NODE_SIZE);
+      // rev 1.0-3 use ksafe_alloc       
+      link_node = (DH_TERM_NODE *)ksafe_alloc(50, DH_AK_NODE_SIZE);
     }
 
     if (!dh_read_group(dh_file, subfile, GetAKFwdLink(dh_file, link_node_ptr->right), (char *)link_node, DH_AK_NODE_SIZE)) {
@@ -2752,8 +2757,8 @@ Private int32_t get_ak_node(DH_FILE *dh_file, int16_t subfile) {
   DH_AK_HEADER *ak_header = NULL;
   DH_FREE_NODE ak_node;
   int64 file_bytes;
-
-  ak_header = (DH_AK_HEADER *)k_alloc(51, DH_AK_HEADER_SIZE);
+   // rev 1.0-3 use ksafe_alloc
+  ak_header = (DH_AK_HEADER *)ksafe_alloc(51, DH_AK_HEADER_SIZE);
 
   if (!dh_read_group(dh_file, subfile, 0, (char *)ak_header, DH_AK_HEADER_SIZE)) {
     goto exit_get_ak_node;
@@ -2791,8 +2796,8 @@ Private bool free_ak_node(DH_FILE *dh_file, int16_t subfile, int32_t node_num) {
   bool status = FALSE;
   DH_AK_HEADER *ak_header = NULL;
   DH_FREE_NODE ak_node;
-
-  ak_header = (DH_AK_HEADER *)k_alloc(54, DH_AK_HEADER_SIZE);
+  // rev 1.0-3 use ksafe_alloc
+  ak_header = (DH_AK_HEADER *)ksafe_alloc(54, DH_AK_HEADER_SIZE);
 
   if (!dh_read_group(dh_file, subfile, 0, (char *)ak_header, DH_AK_HEADER_SIZE)) {
     goto exit_free_ak_node;
@@ -2879,8 +2884,8 @@ Private void ak_delete(DH_FILE *dh_file, /* File descriptor */
 
   do {
     /* Allocate a new buffer area */
-
-    node_ptr = (NODE *)k_alloc(43, sizeof(struct NODE));
+    // rev 1.0-3 use ksafe_alloc
+    node_ptr = (NODE *)ksafe_alloc(43, sizeof(struct NODE));
     node_ptr->prev = tail;
     tail = node_ptr;
     tail->node_num = node_num;
@@ -2985,8 +2990,8 @@ Private void ak_delete(DH_FILE *dh_file, /* File descriptor */
             if (prev_key == NULL) /* Was also leftmost record */
             {
               /* Adjust right pointer from left sibling */
-
-              sibling = (DH_TERM_NODE *)k_alloc(57, DH_AK_NODE_SIZE);
+              // rev 1.0-3 use ksafe_alloc
+              sibling = (DH_TERM_NODE *)ksafe_alloc(57, DH_AK_NODE_SIZE);
 
               if (tail->node.term_node.left != 0) {
                 sibling_node_num = GetAKFwdLink(dh_file, tail->node.term_node.left);
@@ -3121,8 +3126,8 @@ Private STRING_CHUNK *ak_read(DH_FILE *dh_file, /* File descriptor */
   ak_flags = 0;
 
   /* Allocate node buffer */
-
-  node = (AKBUFF *)k_alloc(105, sizeof(AKBUFF));
+  // rev 1.0-3 use ksafe_alloc
+  node = (AKBUFF *)ksafe_alloc(105, sizeof(AKBUFF));
 
   /* Get basic information */
 
@@ -3463,7 +3468,8 @@ Private bool update_internal_node(DH_FILE *dh_file,  /* DH file affected and... 
        the right half.                                                     */
 
     new_node_num = get_ak_node(dh_file, subfile);
-    new_node = (DH_INT_NODE *)k_alloc(55, DH_AK_NODE_SIZE);
+    // rev 1.0-3 use ksafe_alloc 
+    new_node = (DH_INT_NODE *)ksafe_alloc(55, DH_AK_NODE_SIZE);
     memset((char *)new_node, '\0', DH_AK_NODE_SIZE);
 
     new_node->node_type = AK_INT_NODE;
@@ -3514,8 +3520,8 @@ Private bool update_internal_node(DH_FILE *dh_file,  /* DH file affected and... 
 
       /* Create a new root internal node to point to the old and new
          child nodes.                                                 */
-
-      root_node = (NODE *)k_alloc(56, sizeof(struct NODE));
+      // rev 1.0-3 use ksafe_alloc
+      root_node = (NODE *)ksafe_alloc(56, sizeof(struct NODE));
       node_ptr->prev = root_node;
       root_node->prev = NULL;
       root_node->node_num = 1;
@@ -3712,8 +3718,8 @@ bool ak_clear(DH_FILE *dh_file, int16_t subfile) {
   int64 eof;
   int32_t node_num;
   char *buff = NULL;
-
-  buff = (char *)k_alloc(59, DH_AK_NODE_SIZE);
+  // rev 1.0-3 use ksafe_alloc
+  buff = (char *)ksafe_alloc(59, DH_AK_NODE_SIZE);
 
   if (FDS_open(dh_file, subfile)) {
     if (!dh_read_group(dh_file, subfile, 0, buff, DH_AK_HEADER_SIZE)) {
@@ -3807,7 +3813,8 @@ Private STRING_CHUNK *ak_read_record(DH_FILE *dh_file, int16_t subfile, DH_RECOR
 
   if (rec_ptr->flags & DH_BIG_REC) /* Found a large record */
   {
-    buff = (DH_BIG_NODE *)k_alloc(72, DH_AK_NODE_SIZE);
+    // rev 1.0-3 use ksafe_alloc     
+    buff = (DH_BIG_NODE *)ksafe_alloc(72, DH_AK_NODE_SIZE);
 
     node_num = GetAKFwdLink(dh_file, rec_ptr->data.big_rec);
     while (node_num != 0) {

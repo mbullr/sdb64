@@ -18,6 +18,7 @@
  * 
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3  rev 1.0-3 don't fail silently when attempting to access semaphores
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -64,9 +65,11 @@ int main() {
   }
 
   /* Get access to semaphores */
-
-  if (!get_semaphores(FALSE, errmsg))
+  // rev 1.0-3 don't fail silently
+  if (!get_semaphores(FALSE, errmsg)) {
+    fprintf(stderr, "sdlnxd: %s\n", errmsg);
     exit(2);
+  }
 
   /* Set process id into shared memory */
 

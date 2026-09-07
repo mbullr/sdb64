@@ -20,6 +20,7 @@
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
  * rev 0.9.0 Jan 25 mab change dyn file prefix to %
+ * rev 1.0-3 add safe_malloc 
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -47,6 +48,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <ctype.h>
+// rev 1.0-3 for safe_malloc
+#include <sysexits.h>
 
 #define Public
 #define init(a) = a
@@ -632,7 +635,10 @@ int process_file(char* filename) {
          the object code, perform the conversion and then write it back.    */
 
     itype_object = malloc(ak_itype_len);
-
+    if (itype_object  == NULL){
+      fprintf(stderr, "Fatal: Out of memory trying to allocate I-type buffer.\n");
+      exit(EX_OSERR); // Halt the program gracefully
+    }
     grp_offset = ak_itype_ptr;
     p = itype_object;
     bytes_remaining = ak_itype_len;

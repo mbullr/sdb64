@@ -18,6 +18,7 @@
  * 
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3 use safe_malloc, if malloc fails exit(EX_OSERR), Halt the program gracefully
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -382,8 +383,12 @@ bool net_open(char* server,      /* Server name */
 
   if (buff == NULL) {
     buff_size = 32768;
-    buff = (INBUFF*)malloc(buff_size);
-
+// rev 1.0-3 use safe_malloc    
+    buff = (INBUFF*)safe_malloc(buff_size);  // if malloc fails this exit(EX_OSERR), Halt the program gracefully
+    //if (buff == NULL) {
+    //  process.status = -ER_MEM;
+    //  return SV_ON_ERROR;
+    //}
     for (i = 0; i < MAX_HOSTS; i++) {
       host_table[i].ref_ct = 0;
     }
@@ -1021,11 +1026,11 @@ int net_write(FILE_VAR* fvar,
   if (bytes >= buff_size) /* Must reallocate larger buffer */
   {
     bytes = (bytes + BUFF_INCR - 1) & ~BUFF_INCR;
-    q = (INBUFF*)malloc(bytes);
-    if (q == NULL) {
-      process.status = -ER_MEM;
-      return SV_ON_ERROR;
-    }
+    q = (INBUFF*)safe_malloc(bytes); // if malloc fails this exit(EX_OSERR), Halt the program gracefully
+    //if (q == NULL) {
+    //  process.status = -ER_MEM;
+    //  return SV_ON_ERROR;
+    //}
     free(buff);
     buff = q;
   }
@@ -1120,9 +1125,9 @@ Private bool read_packet() {
   {
     free(buff);
     n = (packet_bytes + BUFF_INCR) & ~(BUFF_INCR - 1);
-    buff = (INBUFF*)malloc(n);
-    if (buff == NULL)
-      return FALSE;
+    buff = (INBUFF*)safe_malloc(n);  // if malloc fails this exit(EX_OSERR), Halt the program gracefully
+//    if (buff == NULL)
+//      return FALSE;
     buff_size = n;
   }
 

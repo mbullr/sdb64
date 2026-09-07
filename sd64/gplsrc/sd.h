@@ -56,6 +56,7 @@
 /* Memory management */
 
    #define k_alloc(tag, n) malloc(n)
+   #define ksafe_alloc(tag, n) ksafe_malloc(n)
    #define k_free(p) free(p)
 
 #define k_free_ptr(p) if (p != NULL) k_free(p), p = NULL
@@ -137,6 +138,8 @@ Public char * CRLF init("\r\n");
 void fatal(void);
 void dump(u_char * addr, int32_t bytes);
 void set_console_title(void);
+void *safe_malloc(size_t size);
+void *ksafe_malloc(size_t size);
 
 /* ANALYSE.C */
 int64 dir_filesize(FILE_VAR * fvar);

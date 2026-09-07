@@ -18,6 +18,7 @@
  * 
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3 use safe_malloc 
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -33,6 +34,8 @@
 
 #include <unistd.h>
 #include <grp.h>
+
+void *safe_malloc(size_t size);
 
 typedef struct GROUP_INFO GROUP_INFO;
 struct GROUP_INFO {
@@ -72,7 +75,7 @@ int16_t in_group(char* group_name) {
     } else { /* Not primary group */
       if (groups == NULL) {
         num_groups = getgroups(0, NULL);
-        groups = (gid_t*)malloc(num_groups * sizeof(gid_t));
+        groups = (gid_t*)safe_malloc(num_groups * sizeof(gid_t));
         if (groups != NULL) {
           num_groups = getgroups(num_groups, groups);
         }
@@ -88,8 +91,8 @@ int16_t in_group(char* group_name) {
   }
 
   /* Add this group name to our list of checked names */
-
-  gi = (GROUP_INFO*)malloc(sizeof(GROUP_INFO) + strlen(group_name));
+// rev 1.0-3 use safe_malloc 
+  gi = (GROUP_INFO*)safe_malloc(sizeof(GROUP_INFO) + strlen(group_name));
   strcpy(gi->name, group_name);
   gi->member = status;
   gi->next = gi_head;

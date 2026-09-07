@@ -19,6 +19,7 @@
  * START-HISTORY:
  * 20240219 mab move to only allow AF_UNIX socket types
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3 use safe_malloc 
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -186,11 +187,11 @@ bool start_connection(int unused) {
 
     /* Create output buffer */
 
-    outbuf = (char *)malloc(OUTBUF_SIZE);
-    if (outbuf == NULL) {
-      printf("Unable to allocate socket output buffer\n");
-      return FALSE; /* Error */
-    }
+    outbuf = (char *)safe_malloc(OUTBUF_SIZE);
+    //if (outbuf == NULL) {
+    //  printf("Unable to allocate socket output buffer\n");
+    //  return FALSE; /* Error */
+    //}
   }
 
   case_inversion = TRUE;
