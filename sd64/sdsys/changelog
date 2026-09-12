@@ -1,13 +1,28 @@
 Version 1.0-3
 -------------
-(mab)  GPL.BP APISRVR use logmsg for debug logging
+(mab)  There are an abundance of instances where sd does not check for successful memory allocation via malloc.
+         Create function safe_malloc which on memory allocation failure reports to stderr and terminates sd with exit(EX_OSERR).
+         This is not an ideal situation but halting the program gracefully is probably better than the eventual segfault.
+         For places where k_alloc is used, if there is a test for successful memory allocation leave as is and assume original author's logic is correct.
+         If k_alloc is not protected, switch to using ksafe_alloc which causes a k_error("some message about allocation failure").
+           Assume we can use K_error because kernel is up and running, this results in a clean stop of the system.
+       gplsrc sysseg.c start_sd() treats a failed fork() as success, and the daemon dies silently
+       gplscr sdlnxd.c don't fail silently when attempting to access semaphores
+       gplsrc sp_str4.c op_trimx had int variable skip_count defined as bool (worked because of bool typed as int, but will not work for c2x).
+       Add to examples api_tests/apitest.c  program to test changes made to APISRVR and sdclilib
+       GPL.BP APISRVR use logmsg for debug logging
+          Reformat code and change vb. labels to api.
+          Add ER$INV.NBR - invalid file number
+          Propagate sub set status code back to caller (API.CALL)
        gplsrc sdclilib.c
          Add some connection logging to syslog
          Remove on local connection: set user / group id to user who forked process.
-         Did not make any sense, local connect is forked from running sd process,
-           so by default it must be a valid user.
+           Did not make any sense, local connect is forked from running sd process,
+             so by default it must be a valid user.
            Also causes Apache spawned process to fail, but doesn't if run from test c program ??
- 
+         Test memory allocations (malloc) for failure and abort if unsuccessful, current code would most like seqfault, use exit() instead
+         Add Err_Set Error Set Routine to report errors back to caller
+         SDCallx Correctly return sub name and arg count errors to caller 
          sdclilib logic error?
            sdclilib and APISRVR transfer data between each other via packets written and read either over pipes 
              or sockets. An example of the process from the sdclilib side is as follows:
