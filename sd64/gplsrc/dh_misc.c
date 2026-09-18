@@ -18,6 +18,7 @@
  *
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -147,7 +148,8 @@ void op_fcontrol() {
       if (header.akpath[0] == '\0')
         dh_file->akpath = NULL;
       else {
-        dh_file->akpath = (char*)k_alloc(107, strlen(header.akpath) + 1);
+        // rev 1.0-3 use ksafe_alloc if results not tested
+        dh_file->akpath = (char*)ksafe_alloc(107, strlen(header.akpath) + 1);
         strcpy(dh_file->akpath, header.akpath);
       }
 

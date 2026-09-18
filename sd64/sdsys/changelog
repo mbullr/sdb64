@@ -9,6 +9,11 @@ Version 1.0-3
        gplsrc sysseg.c start_sd() treats a failed fork() as success, and the daemon dies silently
        gplscr sdlnxd.c don't fail silently when attempting to access semaphores
        gplsrc sp_str4.c op_trimx had int variable skip_count defined as bool (worked because of bool typed as int, but will not work for c2x).
+       gplsrc messages.c Remove test for messages directory hold over from messages being a dynamic file.
+             Use ksafe_alloc() for allocations not tested for success
+             Check for error on fstat() and return message if error
+             SD Only Supports English messages so remove non english message support
+             Add sanity check on message size to avoid buffer overflow
        Add to examples api_tests/apitest.c  program to test changes made to APISRVR and sdclilib
        GPL.BP APISRVR use logmsg for debug logging
           Reformat code and change vb. labels to api.

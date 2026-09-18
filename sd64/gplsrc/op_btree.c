@@ -312,8 +312,7 @@ void op_btadda() {
 
   /* Make a new BTree element */
 
-  new_bte = (BTREE_ELEMENT*)k_alloc(
-      27, sizeof(struct BTREE_ELEMENT) + ((keys - 1) * sizeof(char*)));
+  new_bte = (BTREE_ELEMENT*)k_alloc(27, sizeof(struct BTREE_ELEMENT) + ((keys - 1) * sizeof(char*)));
   if (new_bte == NULL)
     bt_no_mem();
 

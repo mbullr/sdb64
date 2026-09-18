@@ -1,4 +1,4 @@
-* Copyright (c)2024 The SD Developers, All Rights Reserved
+* Copyright (c)2026 The SD Developers, All Rights Reserved
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -15,8 +15,8 @@
 * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 *
 PROGRAM MSGTEST
-* 03/31/22 - NextJob test program for messages error
-PRINT 'HERE WE GO'
+* MAB - Test messages.c 
+CRT 'HERE WE GO'
 *
 OPENPATH "/usr/local/sdsys/MESSAGES" TO MSGFV ELSE ABORT "Cannot open MESSAGES"
 *
@@ -26,15 +26,24 @@ READLIST MSGLIST FROM 2 THEN
 *
   MSGCNT = DCOUNT(MSGLIST,@AM)
 *
-  PRINT 'MESSAGE COUNT: ':MSGCNT
+  CRT 'MESSAGE COUNT: ':MSGCNT
 *
-  FOR I = 1 TO 1030
+  FOR I = 1 TO MSGCNT
     IF NUM(MSGLIST<I>) THEN
-      PRINT "1: ":I: ' ':MSGLIST<I>:' ':SYSMSG(MSGLIST<I>)
+      MSG = SYSMSG(MSGLIST<I>)
+      LNS = DCOUNT(MSG,@FM)
+      FOR LN = 1 TO LNS
+            * TEST MARKS IN STRING ??
+            TXT_CNT = DCOUNT(MSG<LN>, @TM)
+            FOR TXT_LN = 1 TO TXT_CNT
+
+                CRT MSGLIST<I>:' ':LN:' ':FIELD(MSG<LN>,@TM,TXT_LN)
+            NEXT TXT_LN
+      NEXT LN
     END 
   NEXT I
 *
 END
 *
-PRINT 'COMPLETE'
+CRT 'COMPLETE'
 END

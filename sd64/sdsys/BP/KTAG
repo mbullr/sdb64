@@ -1,0 +1,108 @@
+program ktag
+* parse gplsrc and save k_alloc tag number and prog name
+* list produced from ktag is useful in debugging memory allocations using k_alloc
+* assumes ktag has been created
+* assumes gplsrc has been created and populated with source files
+*
+*sort dict ktag                                                                                                   Page 1
+*@ID.................   TYPE   LOC...........   CONV..   NAME........   FORMAT   S/M   ASSOC...
+*@ID                    D      0                         ktag           10L      S
+*PROG                   D      1                         PROG NAME      10L      M     MVPROG
+*LN                     D      2                         Line Nbr       5L       M     MVPROG
+*MVPROG                 PH     PROG LN
+*
+* once program is run generate report:
+* list ktag by.exp prog prog ln csv to KTAG.CSV
+* use ktag.csv to id what program made the memory allocation request
+
+
+crt "generating ktag from gplsrc":
+input ok
+if upcase(ok) = "Y" or upcase(ok) = "YES" then
+    null
+end else 
+    crt "complte"
+    goto 9999
+end
+*
+open "ktag" to ktag else abort "cannot open ktag"
+open "gplsrc" to gplsrc then
+
+    select gplsrc to 2
+    readlist ids from 2 then
+        id_count = dcount(ids,@fm)
+        crt "files to process: ":id_count
+        for i = 1 to id_count
+            c_id = ids<i>
+            gosub process_c
+        next i
+    end
+
+    crt "complete"
+end else
+    crt "cannot opne gplsrc"
+end
+goto 9999 
+*****************************************************************
+* process_c
+* read c source from gplsrc id in c_id
+* look for k_alloc(nbr
+* if found save c_id in ktag record id = nbr
+process_c:
+    crt "processing: ":c_id
+    read c_source from gplsrc, c_id then
+        lns = dcount(c_source,@fm)
+        crt "   lines to process: ":lns
+        for ln = 1 to lns
+        *
+        * look for string "k_alloc(" in source lines
+        s_ln = upcase(trim(c_source<ln>))
+        cmmt = s_ln[1,2]
+        begin case
+            case cmmt = "//"     ;* comment
+                null
+            case cmmt = "/*"     ;* comment
+                null
+            case 1
+                loc = index(s_ln, "K_ALLOC(",1)
+                if loc = 0 then
+                    null  ;* not found
+                end else
+                    * loc is position of "K", lets get the string starting after the "("
+                    sub_str = s_ln[loc + 8,99]
+                    * grab the number (should be separated by ","
+                    nbr = field(sub_str,",",1)
+                    if num(nbr) and nbr <> "" then
+                        * got it, see if this kag already exists
+                        read ktag_rec from ktag, nbr then
+                            * found, append
+                            ktag_rec<1,-1> = c_id
+                            ktag_rec<2,-1> = ln
+                        end else
+                            * not there, create it
+                            ktag_rec = c_id
+                            ktag_rec<2> = ln
+                        end
+                        crt "writing rec: ":ktag_rec
+                        crt "         id: ":nbr
+                        write ktag_rec on ktag, nbr
+                     end else
+                        crt c_id:" found K_ALLOC( but number could not be evaluated"
+                        crt "   ln: ":ln
+                        crt "  src: ":s_ln
+                     end
+                end
+            
+        end case                
+                
+        
+        next ln
+    
+    
+    end else
+        crt "file: ":c_id : " not found, skipped"
+    end
+return
+
+9999
+end

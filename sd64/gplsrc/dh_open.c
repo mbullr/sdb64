@@ -23,6 +23,7 @@
  * START-DESCRIPTION:
  * 31 Dec 23 SD launch - prior history suppressed
  * rev 0.9.0 Jan 25 mab change dyn file prefix to %
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * END-DESCRIPTION
  *
  * START-CODE
@@ -228,6 +229,7 @@ DH_FILE* dh_open(char path[]) {
   if (header.akpath[0] == '\0')
     dh_file->akpath = NULL;
   else {
+    // rev 1.0-3 use ksafe_alloc if results not tested
     dh_file->akpath = (char*)k_alloc(106, strlen(header.akpath) + 1);
     strcpy(dh_file->akpath, header.akpath);
   }
@@ -244,8 +246,9 @@ DH_FILE* dh_open(char path[]) {
   /* Load trigger function, if any */
 
   if (header.trigger_name[0] != '\0') {
+    // rev 1.0-3 use ksafe_alloc if results not tested
     dh_file->trigger_name =
-        (char*)k_alloc(69, strlen(header.trigger_name) + 1); /* 0259 */
+        (char*)ksafe_alloc(69, strlen(header.trigger_name) + 1); /* 0259 */
     strcpy(dh_file->trigger_name, header.trigger_name);
 
     /* Attempt to snap link to trigger function */
@@ -341,7 +344,7 @@ DH_FILE* dh_open(char path[]) {
         if (ak_node_num != 0) /* Long expression */
         {
           /* Fetch I-type from separate node */
-
+          //rev 1.0-3 use ksafe_alloc if results not tested
           ibuff = (char*)k_alloc(53, DH_AK_NODE_SIZE);
           do {
             if (!dh_read_group(dh_file, subfile, ak_node_num, ibuff,

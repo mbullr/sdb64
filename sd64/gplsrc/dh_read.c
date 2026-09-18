@@ -18,6 +18,7 @@
  * 
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -171,7 +172,8 @@ STRING_CHUNK* dh_read_record(DH_FILE* dh_file, DH_RECORD* rec_ptr) {
   if (rec_ptr->flags & DH_BIG_REC) /* Found a large record */
   {
     group_bytes = (int16_t)(dh_file->group_size);
-    buff = (char*)k_alloc(60, group_bytes);
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    buff = (char*)ksafe_alloc(60, group_bytes);
 
     grp = GetFwdLink(dh_file, rec_ptr->data.big_rec);
     while (grp != 0) {

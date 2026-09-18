@@ -19,6 +19,11 @@
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
  * rev 0.9.1 Mar 25 mab correct output of messages with embedded newline
+ * rev 1.0-3 Remove test for messages directory hold over from messages being a dynamic file.
+ *           Use ksafe_alloc() for allocations not tested for success
+ *           Check for error on fstat() and return message if error
+ *           SD Only Supports English messages so remove non english message support
+ *           Add sanity check on message size to avoid buffer overflow
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -53,8 +58,7 @@ char* day_names[7] = {"Monday", "Tuesday",  "Wednesday", "Thursday",
                       "Friday", "Saturday", "Sunday"};
 
 Private char* message = NULL;
-Private int message_len;
-Private int msg_file = -1;
+Private int message_buf_sz;
 
 /* ======================================================================
    Select a language                                                      */
@@ -84,8 +88,8 @@ bool load_language(char* language_prefix) {
   p = sysmsg(1500); /* TODO: Magic numbers are bad, mmkay? */
   if ((*p == '[') || (strdcount(p, ',') != 12))
     p = default_months; /* 0289 */
-
-  month_names[0] = (char*)k_alloc(83, strlen(p) + 1);
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  month_names[0] = (char*)ksafe_alloc(83, strlen(p) + 1);
   strcpy(month_names[0], p);
   (void)strtok(month_names[0], ",");
   for (i = 1; i < 12; i++)
@@ -96,7 +100,8 @@ bool load_language(char* language_prefix) {
   p = sysmsg(1501); /* TODO: Magic numbers are bad, mmkay? */
   if ((*p == '[') || (strdcount(p, ',') != 7))
     p = default_days; /* 0289 */
-  day_names[0] = (char*)k_alloc(84, strlen(p) + 1);
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  day_names[0] = (char*)ksafe_alloc(84, strlen(p) + 1);
   strcpy(day_names[0], p);
   (void)strtok(day_names[0], ",");
   for (i = 1; i < 7; i++)
@@ -121,88 +126,82 @@ char* sysmsg(int msg_no) {
   /* STRING_CHUNK* q; unused variable */
   struct stat msg_stat; /* Holds Dir records files stats */
   int status;
+  int message_len;
 
-  if (msg_file == -1) {
-    message_len = 128;
-    if (message == NULL)
-      message = (char*)k_alloc(82, message_len);
-    /* converted to snprintf() -gwb 22Feb20 */
-    if (snprintf(path, MAX_PATHNAME_LEN + 1, "%s%cMESSAGES", sysseg->sysdir, 
-               DS) >= (MAX_PATHNAME_LEN + 1)) {
-      /* TODO: this should be sent to the system log. */
-      k_error("Overflowed directory/filename path length in sysmsg()!");
-      message = "";
-      //goto exit_sysmsg;  /* I died inside adding this. -gwb */
-      return message;
-    }
-    msg_file = open(path, O_RDONLY);
-    if (msg_file < 0) {
-      sprintf(message, "[%d] Message file not found(%d %d).", msg_no, dh_err,
-              process.os_error);
-      return message;
-    }
-    /* close(msg_file); Don't need to keep it open, just checking its there */
+ 
+  if (message == NULL){
+      message_buf_sz = 128+1; 
+      // rec 1.0-3 use ksafe_alloc if results not tested, also add 1 buffer size for null terminator
+      // There can be an issue if the message length is a multiple of 128 and we add a null terminator
+      message = (char*)ksafe_alloc(82, message_buf_sz);
+  }
+  /* rev 1.0-3 SD Only Supports English messages so remove non english message support */
+
+  n = sprintf(id, "%d", msg_no);
+  if (snprintf(path, MAX_PATHNAME_LEN + 1, "%s%cMESSAGES%c%s", sysseg->sysdir, 
+         DS, DS, id) >= (MAX_PATHNAME_LEN + 1)) {
+    /* TODO: this should be sent to the system log. */
+    k_error("Overflowed directory/filename path length in sysmsg()!");
+    *message = '\0';
+    return message;  
   }
 
-  /* Open language specific msg */
-  if (prefix[0] != '\0') {
-    n = sprintf(id, "%s%d", prefix, msg_no);
-    /* converted to snprintf() -gwb 22Feb20 */
-    if (snprintf(path, MAX_PATHNAME_LEN + 1, "%s%cMESSAGES%c%s", sysseg->sysdir, 
-            DS, DS, id) >= (MAX_PATHNAME_LEN + 1)) {
-      /* TODO: this should be sent to the system log. */
-      k_error("Overflowed directory/filename path length in sysmsg()!");
-      message = "";
-      // goto exit_sysmsg;  /* I died inside adding this. -gwb */
-      return message; /* ...and un-died! */
-    }
-    msg_rec = open(path, O_RDONLY);
-  }
-
-  /* Try English messages */
+  msg_rec = open(path, O_RDONLY);
   if (msg_rec < 0) {
-    n = sprintf(id, "%d", msg_no);
-    /* converted to snprintf() -gwb 22Feb20 */
-    if (snprintf(path, MAX_PATHNAME_LEN + 1, "%s%cMESSAGES%c%s", sysseg->sysdir, 
-            DS, DS, id) >= (MAX_PATHNAME_LEN + 1)) {
-      /* TODO: this should be sent to the system log. */
-      k_error("Overflowed directory/filename path length in sysmsg()!");
-      message = "";
-      // goto exit_sysmsg;  /* I died inside adding this. -gwb */
-      return message;  /* and un-died. */
-    }
-    msg_rec = open(path, O_RDONLY);
-  }
-
-  if (msg_rec >= 0) {
-    /* Get size of record to come */
-    status = fstat(msg_rec, &msg_stat);
-    int msg_size = msg_stat.st_size;
-
-    /* Check buffer size */
-    if (msg_size > message_len) { /* Must increase buffer size */
-      k_free(message); /* Release old buffer */
-
-      n = (msg_size & ~127) +
-          ((msg_size & 127) ? 128 : 0); /* Round to multiple of 128 bytes */
-      message = (char*)k_alloc(82, n);
-      message_len = n;
-    }
-
-    /* Read message rec */
-    status = read(msg_rec, message, msg_size);
-    message[msg_size] = '\0';
-    /*printf("FILE (%s) %d\n", path, msg_size);*/
-  }
-
-  if (msg_rec < 0 || status < 0) { /* Either open or read failed */
     sprintf(message, "[%s] Message not found", id);
+    return message;
+  } 
+  
+
+
+  /* Get size of record to come */
+  status = fstat(msg_rec, &msg_stat);
+  // rev 1.0-3 check for error on fstat() and return message if error
+  if (status < 0) {
+    sprintf(message, "[%s] Message not found", id);
+    close(msg_rec);
+    return message;
   }
+  size_t msg_size = msg_stat.st_size;
+  /* rev 1.0-3 sanity check on message size */
+  /* Check buffer size */
+  if (msg_size > MAX_MESSAGE_SIZE) {
+    sprintf(message, "[%s] Message too long", id);
+    close(msg_rec);
+    return message;
+  }
+
+  if (msg_size + 1 > message_buf_sz) { /* Must increase buffer size */
+    k_free(message); /* Release old buffer */
+    message_buf_sz = (msg_size & ~127) +
+      ((msg_size & 127) ? 128 : 0); /* Round to multiple of 128 bytes */
+    // rev 1.0-3 message len a mult of 128 will cause an overflow at = "\0" add 1 more byte 
+    message_buf_sz += 1; // add 1 for null terminator   
+    // rev 1.0-3 use ksafe_alloc if results not tested 
+    message = (char*)ksafe_alloc(82, message_buf_sz);
+  }
+
+  /* Read message rec */
+  status = read(msg_rec, message, msg_size);
+  if (status < 0) {
+    sprintf(message, "[%s] Message not found", id);
+    close(msg_rec);
+    return message;
+  } else {   
+    if (status != msg_size) {
+      close(msg_rec);
+      sprintf(message, "[%s] Message not found (short read)", id);  // short read ??
+      return message;
+    } else {
+      message[msg_size] = '\0';  // null terminate
+    }
+  }
+
   /* njs - 01Feb23 mimic how basic program would read DIRECTORY_FILE via VM */
   /* consult op_dio3.2 read_record() */
   /* first remove trailing new line  */
   message_len = strlen(message);
-   if (message[message_len-1] == '\n')
+  if (message_len > 0 && message[message_len - 1] == '\n')
     message[message_len-1] = '\0';
   /* njs - 01Feb23 Walk through and replace newlines by field marks. */
   p = message;

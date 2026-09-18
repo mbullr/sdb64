@@ -19,6 +19,8 @@
  * START-HISTORY):
  * 31 Dec 23 SD launch - prior history suppressed
  * rev 0.9.0 Jan 25 mab change dyn file prefix to %
+ * rev 1.0-3 use ksafe_alloc if results not tested 
+ * 
  * END-HISTORY
  *
  * START-DESCRIPTION:

@@ -19,6 +19,8 @@
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
  * rev 0.9.0 Jan 25 mab change dyn file prefix to % 
+ * rev 1.0-3 use ksafe_alloc if results not tested 
+ * 
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -402,7 +404,8 @@ int32_t dh_get_overflow(
     /* Must make new overflow block(s) */
 
     group_bytes = (int16_t)(dh_file->group_size);
-    buff = (char*)k_alloc(74, group_bytes);
+   // rev 1.0-3 use ksafe_alloc
+    buff = (char*)ksafe_alloc(74, group_bytes);
 
     if (!ValidFileHandle(dh_file->sf[subfile].fu)) {
       if (!FDS_open(dh_file, subfile)) {
@@ -472,8 +475,8 @@ void dh_free_overflow(DH_FILE* dh_file, int32_t ogrp) {
 
   fptr = FPtr(dh_file->file_id);
   group_bytes = (int16_t)(dh_file->group_size);
-
-  buff = (char*)k_alloc(103, group_bytes);
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  buff = (char*)ksafe_alloc(103, group_bytes);
   memset(buff, '\0', group_bytes);
 
   header_lock = GetGroupWriteLock(dh_file, 0);
