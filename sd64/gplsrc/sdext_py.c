@@ -406,6 +406,14 @@ static int sd_py_poll(void)
 
   return 0;
 }
+int sdext_py_finalize(void){
+      if (Py_IsInitialized()) {  /* only finalize if previously initialized */
+        sd_event_queue_shutdown();
+        return Py_FinalizeEx();
+      } else {
+        return SD_PyEr_NotInit; 
+      }
+}
 
 void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
 
@@ -416,8 +424,6 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
   int myResult;
 
   PyObject *pval, *prun;
-
-  char shutdown[] = "shutdown";
   char nullresult[] = "";
   
   process.status = 0;   /* setup status() value */
@@ -485,18 +491,12 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
     case SD_PyFinal: /* Finalize the python interpreter   */
       /* rem  global_dict, main_module are Borrowed Reference  */
                   
-      if (Py_IsInitialized()) {  /* only finalize if previously initialized */
-        sd_event_queue_shutdown();
-        myResult = Py_FinalizeEx();
-      } else {
-        myResult = 0; 
-      }
+      myResult = sdext_py_finalize();
       
-      if (strcmp(Arg, shutdown) != 0){    /* test for shutdown, nothing to return */
-        process.status = myResult;
-        InitDescr(e_stack, INTEGER);
-        (e_stack++)->data.value = (int32_t)myResult;
-      }
+      process.status = myResult;
+      InitDescr(e_stack, INTEGER);
+      (e_stack++)->data.value = (int32_t)myResult;
+
       break;
 
     case SD_IsPyInit: /* Is python interpreter initialized?   */

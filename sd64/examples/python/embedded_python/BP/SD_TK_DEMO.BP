@@ -1,10 +1,15 @@
-PROGRAM SD.TK.DEMO
-
+PROGRAM SD_TK_DEMO.BP
+* rem must start sd with -internal flag and compiler option must be set
+$internal
 EQUATE SD.PY.INIT TO 2000
 EQUATE SD.PY.FINAL TO 2001
 EQUATE SD.PY.RUN.FILE TO 2011
 EQUATE SD.PY.GUI.STEP TO 2020
 EQUATE SD.PY.POLL TO 2021
+
+* rem to point these to where you save the python scripts
+SETUP.FILE = "/home/sd/user_accounts/xxxxx/BP/sd_tk_setup.py"
+STEP.FILE = "/home/sd/user_accounts/xxxxx/BP/sd_tk_step.py"
 
 STATUS.VALUE = SDEXT("", 0, SD.PY.INIT)
 IF STATUS() # 0 THEN
@@ -12,12 +17,25 @@ IF STATUS() # 0 THEN
     STOP
 END
 
-STATUS.VALUE = SDEXT("sd_tk_setup.py", 0, SD.PY.RUN.FILE)
+CRT "Python initialized"
+CRT "Setup gui_step function"
+
+STATUS.VALUE = SDEXT(STEP.FILE, 0,SD.PY.RUN.FILE)
+IF STATUS() # 0 THEN
+    PRINT "Tkinter step setup failed: ":STATUS()
+    GOTO SHUTDOWN
+END
+
+CRT "Setup Gui Window"
+
+STATUS.VALUE = SDEXT(SETUP.FILE, 0, SD.PY.RUN.FILE)
 IF STATUS() # 0 THEN
     PRINT "Tkinter setup failed: ":STATUS()
     GOTO SHUTDOWN
 END
 
+
+CRT "Run the gui loop"
 DONE = 0
 LOOP WHILE DONE = 0
     STATUS.VALUE = SDEXT("", 0, SD.PY.GUI.STEP)
@@ -27,8 +45,8 @@ LOOP WHILE DONE = 0
     END ELSE
         EVENT = SDEXT("", 0, SD.PY.POLL)
         IF STATUS() = 0 THEN
-            EVENT.NAME = FIELD(EVENT, 1, FM)
-            EVENT.DATA = FIELD(EVENT, 2, FM)
+            EVENT.NAME = FIELD(EVENT,@FM, 1)
+            EVENT.DATA = FIELD(EVENT,@FM, 2)
             PRINT "GUI EVENT"
             PRINT "  NAME: ":EVENT.NAME
             PRINT "  DATA: ":EVENT.DATA
@@ -40,6 +58,8 @@ LOOP WHILE DONE = 0
 REPEAT
 
 SHUTDOWN:
-STATUS.VALUE = SDEXT("shutdown", 0, SD.PY.FINAL)
-PRINT "SD Tkinter demo ended"
-RETURN
+*  Rem we do not want to shutdown between runs
+** crt 'shutting down'
+**STATUS.VALUE = SDEXT("shutdown", 0, SD.PY.FINAL)
+PRINT "SD Tkinter demo ended: ":STATUS.VALUE
+END

@@ -1,0 +1,72 @@
+import tkinter as tk
+from tkinter import messagebox
+# rem sd module is c code found and registered in sdext_py.c
+import sd
+
+root = tk.Tk()
+root.title("SD Tkinter Demo")
+root.geometry("500x350")
+
+_gui_closed = False
+_close_event_sent = False
+
+
+def post_event(name, payload=""):
+    if not _gui_closed:
+        sd.post_event(name, payload)
+
+
+def on_save():
+    content = text_box.get("1.0", "end-1c")
+    post_event("button", content)
+
+
+def on_clear():
+    # Clear from line 1, character 0 to the end
+    text_box.delete("1.0", tk.END)
+    post_event("button", "clear")
+
+
+def on_close():
+    global _gui_closed, _close_event_sent
+
+    if _close_event_sent:
+        return
+
+    _close_event_sent = True
+    _gui_closed = True
+    sd.post_event("window", "closed")
+    root.destroy()
+
+
+root.protocol("WM_DELETE_WINDOW", on_close)
+
+frame = tk.Frame(root)
+frame.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
+
+tk.Label(frame, text="SD Tkinter cooperative demo").pack(pady=10)
+
+# 3. Create the Scrollbar
+scrollbar = tk.Scrollbar(frame)
+scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+# 4. Create the Multiline Text Widget
+# 'wrap="word"' ensures lines break cleanly at word boundaries
+text_box = tk.Text(frame, wrap="word", yscrollcommand=scrollbar.set, font=("Arial", 11), width=80, height=10 )
+text_box.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
+
+# Link scrollbar to the text box
+scrollbar.config(command=text_box.yview)
+
+# 6. Action Buttons
+btn_frame = tk.Frame(root)
+btn_frame.pack(pady=10)
+
+btn_save = tk.Button(btn_frame, text="Save Text", command=on_save, width=12)
+btn_save.pack(side=tk.LEFT, padx=5)
+
+btn_clear = tk.Button(btn_frame, text="clear", command=on_clear, width=12)
+btn_clear.pack(side=tk.LEFT, padx=5)
+
+root.update_idletasks()
+root.update()
