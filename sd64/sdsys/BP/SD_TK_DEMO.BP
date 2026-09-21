@@ -1,0 +1,45 @@
+PROGRAM SD.TK.DEMO
+
+EQUATE SD.PY.INIT TO 2000
+EQUATE SD.PY.FINAL TO 2001
+EQUATE SD.PY.RUN.FILE TO 2011
+EQUATE SD.PY.GUI.STEP TO 2020
+EQUATE SD.PY.POLL TO 2021
+
+STATUS.VALUE = SDEXT("", 0, SD.PY.INIT)
+IF STATUS() # 0 THEN
+    PRINT "Python initialization failed: ":STATUS()
+    STOP
+END
+
+STATUS.VALUE = SDEXT("sd_tk_setup.py", 0, SD.PY.RUN.FILE)
+IF STATUS() # 0 THEN
+    PRINT "Tkinter setup failed: ":STATUS()
+    GOTO SHUTDOWN
+END
+
+DONE = 0
+LOOP WHILE DONE = 0
+    STATUS.VALUE = SDEXT("", 0, SD.PY.GUI.STEP)
+    IF STATUS() # 0 THEN
+        PRINT "Tkinter step failed: ":STATUS()
+        DONE = 1
+    END ELSE
+        EVENT = SDEXT("", 0, SD.PY.POLL)
+        IF STATUS() = 0 THEN
+            EVENT.NAME = FIELD(EVENT, 1, FM)
+            EVENT.DATA = FIELD(EVENT, 2, FM)
+            PRINT "GUI EVENT"
+            PRINT "  NAME: ":EVENT.NAME
+            PRINT "  DATA: ":EVENT.DATA
+            IF EVENT.NAME = "window" AND EVENT.DATA = "closed" THEN
+                DONE = 1
+            END
+        END
+    END
+REPEAT
+
+SHUTDOWN:
+STATUS.VALUE = SDEXT("shutdown", 0, SD.PY.FINAL)
+PRINT "SD Tkinter demo ended"
+RETURN

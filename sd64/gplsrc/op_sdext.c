@@ -249,6 +249,8 @@ void op_sdext() {
     case SD_PyRunStr:  
     case SD_PyRunFile: 
     case SD_PyGetAtt :
+    case SD_PyGuiStep:
+    case SD_PyPoll:
   /* embedding Python functions*/
       sdext_py(key, SDMEArgArray[0], NULL, NULL);
       break;

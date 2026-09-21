@@ -29,8 +29,7 @@
  * START-DESCRIPTION:
  *
  * The message library (SDSYS MESSAGES file) uses numbers to identify
- * messages. For non-English texts, the message number is prefixed by a
- * language code of up to three letters.
+ * messages. 
  *
  * Message numbers are groups according to their role. Open source
  * developers should use numbers in the range 10000 to 19999.

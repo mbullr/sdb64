@@ -336,4 +336,10 @@
 #define SD_PyErr_NotList   -12034    /* Object not a list  */
 #define SD_PyErr_LstAppdEr -12035    /* List append failed */
 #define SD_PyErr_LstClrEr  -12036    /* list clear failed  */
+#define SD_PyErr_EventInit -12040    /* Failed to initialize Python event queue */
+#define SD_PyErr_EventEmpty -12041   /* Python event queue is empty */
+#define SD_PyErr_EventFull -12042    /* Python event queue is full */
+#define SD_PyErr_EventClosed -12043  /* Python event queue is closed */
+#define SD_PyErr_EventTooBig -12044  /* Python event is too large */
+#define SD_PyErr_GuiError -12045     /* Python GUI step failed */
 /* END-CODE */

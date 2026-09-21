@@ -91,6 +91,10 @@ void set_old_tty_modes(void);
 void set_new_tty_modes(void);
 bool negotiate_telnet_parameter(void);
 
+#ifdef EMBED_PYTHON
+extern void sd_python_event_drain(void);
+#endif
+
 /* ======================================================================
    start_connection()  -  Start Linux socket / pipe based connection      */
 
@@ -811,23 +815,44 @@ bool flush_outbuf() {
 /* ====================================================================== */
 
 int sdpoll(int fd, int timeout) {
-#ifdef DO_NOT_USE_POLL
-  fd_set fds;
-  struct timeval tv;
-
-  FD_ZERO(&fds);
-  FD_SET(fd, &fds);
-  tv.tv_sec = timeout / 1000;
-  tv.tv_usec = (timeout % 1000) * 1000;
-  return select(1, &fds, NULL, NULL, &tv);
-#else
-  struct pollfd fds[1];
+  struct pollfd fds[2];
+  int fd_count = 1;
+  int python_index = -1;
+  int result;
 
   fds[0].fd = fd;
   fds[0].events = POLLIN;
+  fds[0].revents = 0;
 
-  return poll(fds, 1, timeout);
+#ifdef EMBED_PYTHON
+  {
+    int python_fd = sd_python_event_fd();
+
+    if (python_fd >= 0 && python_fd != fd) {
+      python_index = fd_count++;
+      fds[python_index].fd = python_fd;
+      fds[python_index].events = POLLIN;
+      fds[python_index].revents = 0;
+    }
+  }
 #endif
+
+  result = poll(fds, fd_count, timeout);
+  if (result < 0)
+    return result;
+
+#ifdef EMBED_PYTHON
+  if (python_index >= 0 &&
+      (fds[python_index].revents & (POLLIN | POLLERR | POLLHUP))) {
+    sd_python_event_ready();
+    sd_python_event_drain();
+  }
+#endif
+
+  if (fds[0].revents & (POLLIN | POLLERR | POLLHUP))
+    return 1;
+
+  return 0;
 }
 
 /* END-CODE */

@@ -99,7 +99,7 @@ extern char *x_option; /* -x option */
 
 /* 20240808 mab embedding python? */
 #ifdef EMBED_PYTHON
-extern void sdext_py(int key, char* Arg);
+extern void sdext_py(int key, char* Arg, char* Arg2, char* Arg3);
 #endif
 
 bool bind_sysseg(bool create, char *errmsg);
@@ -252,7 +252,7 @@ int main(int argc, char *argv[]) {
   /* 20240808 mab embedding python? */
   #ifdef EMBED_PYTHON
   char py_shutdown[] = "shutdown";
-  sdext_py(SD_PyFinal, py_shutdown);   /* if python was used, shut it down */
+  sdext_py(SD_PyFinal, py_shutdown, NULL, NULL);   /* if python was used, shut it down */
   #endif
 
   clean_stop();

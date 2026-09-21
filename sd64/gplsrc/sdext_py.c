@@ -58,8 +58,11 @@
 
 #include "sdext_python_inc.h"  /* NOTE! this file is created by the install script !!! */
 #include "sd.h"
+#include <fcntl.h>
 #include <linux/limits.h>
 #include <libgen.h>            /* needed for basename function */ 
+#include <pthread.h>
+#include <unistd.h>
 
 #include "keys.h"
 
@@ -93,6 +96,317 @@ void obj_to_str(PyObject* pval);
 
 PyObject *global_dict, *main_module;  /* global PyObjects that must hang around between calls */
 
+#define SD_EVENT_NAME_SIZE 64
+#define SD_EVENT_PAYLOAD_SIZE 4096
+#define SD_EVENT_QUEUE_LIMIT 1024
+
+typedef struct SD_EVENT {
+  char name[SD_EVENT_NAME_SIZE];
+  char payload[SD_EVENT_PAYLOAD_SIZE];
+  struct SD_EVENT *next;
+} SD_EVENT;
+
+static struct {
+  SD_EVENT *head;
+  SD_EVENT *tail;
+  int count;
+  int read_fd;
+  int write_fd;
+  bool shutting_down;
+  pthread_mutex_t mutex;
+} sd_event_queue = {
+  NULL, NULL, 0, -1, -1, FALSE, PTHREAD_MUTEX_INITIALIZER
+};
+
+static volatile bool python_event_pending = FALSE;
+static bool sd_module_registered = FALSE;
+
+static int sd_event_queue_init(void);
+static void sd_event_queue_shutdown(void);
+static int sd_event_enqueue(const char *name, const char *payload);
+static SD_EVENT *sd_event_dequeue(void);
+static void sd_event_drain_wakeup(void);
+static int sd_py_gui_step(void);
+static int sd_py_poll(void);
+
+int sd_python_event_fd(void)
+{
+  return sd_event_queue.read_fd;
+}
+
+void sd_python_event_ready(void)
+{
+  python_event_pending = TRUE;
+}
+
+void sd_python_event_clear(void)
+{
+  python_event_pending = FALSE;
+}
+
+void sd_python_event_drain(void)
+{
+  sd_event_drain_wakeup();
+}
+
+int sd_python_event_count(void)
+{
+  int count;
+
+  pthread_mutex_lock(&sd_event_queue.mutex);
+  count = sd_event_queue.count;
+  pthread_mutex_unlock(&sd_event_queue.mutex);
+
+  return count;
+}
+
+static int sd_event_queue_init(void)
+{
+  int fds[2];
+
+  if (sd_event_queue.read_fd >= 0)
+    return 0;
+
+  if (pipe(fds) != 0)
+    return SD_PyErr_EventInit;
+
+  if (fcntl(fds[0], F_SETFL, O_NONBLOCK) != 0 ||
+      fcntl(fds[1], F_SETFL, O_NONBLOCK) != 0) {
+    close(fds[0]);
+    close(fds[1]);
+    return SD_PyErr_EventInit;
+  }
+
+  pthread_mutex_lock(&sd_event_queue.mutex);
+  sd_event_queue.read_fd = fds[0];
+  sd_event_queue.write_fd = fds[1];
+  sd_event_queue.shutting_down = FALSE;
+  sd_event_queue.count = 0;
+  python_event_pending = FALSE;
+  pthread_mutex_unlock(&sd_event_queue.mutex);
+
+  return 0;
+}
+
+static int sd_event_enqueue(const char *name, const char *payload)
+{
+  SD_EVENT *event;
+  char notification = 'x';
+
+  if (name == NULL || strlen(name) >= SD_EVENT_NAME_SIZE ||
+      (payload != NULL && strlen(payload) >= SD_EVENT_PAYLOAD_SIZE))
+    return SD_PyErr_EventTooBig;
+
+  event = calloc(1, sizeof(SD_EVENT));
+  if (event == NULL)
+    return SD_Mem_Err;
+
+  snprintf(event->name, sizeof(event->name), "%s", name);
+  if (payload != NULL)
+    snprintf(event->payload, sizeof(event->payload), "%s", payload);
+
+  pthread_mutex_lock(&sd_event_queue.mutex);
+
+  if (sd_event_queue.shutting_down) {
+    pthread_mutex_unlock(&sd_event_queue.mutex);
+    free(event);
+    return SD_PyErr_EventClosed;
+  }
+
+  if (sd_event_queue.count >= SD_EVENT_QUEUE_LIMIT) {
+    pthread_mutex_unlock(&sd_event_queue.mutex);
+    free(event);
+    return SD_PyErr_EventFull;
+  }
+
+  if (sd_event_queue.tail == NULL)
+    sd_event_queue.head = event;
+  else
+    sd_event_queue.tail->next = event;
+  sd_event_queue.tail = event;
+  sd_event_queue.count++;
+
+  pthread_mutex_unlock(&sd_event_queue.mutex);
+
+  sd_python_event_ready();
+  if (sd_event_queue.write_fd >= 0)
+    (void)write(sd_event_queue.write_fd, &notification, 1);
+
+  return 0;
+}
+
+static SD_EVENT *sd_event_dequeue(void)
+{
+  SD_EVENT *event;
+
+  pthread_mutex_lock(&sd_event_queue.mutex);
+  event = sd_event_queue.head;
+  if (event != NULL) {
+    sd_event_queue.head = event->next;
+    event->next = NULL;
+    if (sd_event_queue.head == NULL)
+      sd_event_queue.tail = NULL;
+    sd_event_queue.count--;
+  }
+  pthread_mutex_unlock(&sd_event_queue.mutex);
+
+  return event;
+}
+
+static void sd_event_drain_wakeup(void)
+{
+  char buffer[64];
+
+  if (sd_event_queue.read_fd < 0)
+    return;
+
+  while (read(sd_event_queue.read_fd, buffer, sizeof(buffer)) > 0)
+    ;
+}
+
+static void sd_event_queue_shutdown(void)
+{
+  SD_EVENT *event;
+  SD_EVENT *next;
+
+  pthread_mutex_lock(&sd_event_queue.mutex);
+  sd_event_queue.shutting_down = TRUE;
+  event = sd_event_queue.head;
+  sd_event_queue.head = NULL;
+  sd_event_queue.tail = NULL;
+  sd_event_queue.count = 0;
+  pthread_mutex_unlock(&sd_event_queue.mutex);
+
+  while (event != NULL) {
+    next = event->next;
+    free(event);
+    event = next;
+  }
+
+  if (sd_event_queue.read_fd >= 0)
+    close(sd_event_queue.read_fd);
+  if (sd_event_queue.write_fd >= 0)
+    close(sd_event_queue.write_fd);
+  sd_event_queue.read_fd = -1;
+  sd_event_queue.write_fd = -1;
+  sd_python_event_clear();
+}
+
+static PyObject *sd_post_event(PyObject *self, PyObject *args)
+{
+  PyObject *py_name;
+  PyObject *py_payload = Py_None;
+  const char *name;
+  const char *payload = "";
+  int result;
+
+  if (!PyArg_ParseTuple(args, "O|O:post_event", &py_name, &py_payload))
+    return NULL;
+  if (!PyUnicode_Check(py_name)) {
+    PyErr_SetString(PyExc_TypeError, "event name must be a string");
+    return NULL;
+  }
+
+  name = PyUnicode_AsUTF8(py_name);
+  if (name == NULL)
+    return NULL;
+
+  if (py_payload != Py_None) {
+    if (!PyUnicode_Check(py_payload)) {
+      PyErr_SetString(PyExc_TypeError,
+                      "event payload must be a string or None");
+      return NULL;
+    }
+    payload = PyUnicode_AsUTF8(py_payload);
+    if (payload == NULL)
+      return NULL;
+  }
+
+  result = sd_event_enqueue(name, payload);
+  if (result == SD_PyErr_EventFull)
+    PyErr_SetString(PyExc_BufferError, "SD event queue is full");
+  else if (result == SD_PyErr_EventClosed)
+    PyErr_SetString(PyExc_RuntimeError, "SD event queue is closed");
+  else if (result != 0)
+    PyErr_Format(PyExc_RuntimeError, "could not enqueue SD event: %d", result);
+  else
+    Py_RETURN_NONE;
+
+  return NULL;
+}
+
+static PyMethodDef sd_methods[] = {
+  {"post_event", sd_post_event, METH_VARARGS,
+   "Queue an event for the SD BASIC program."},
+  {NULL, NULL, 0, NULL}
+};
+
+static struct PyModuleDef sd_module = {
+  PyModuleDef_HEAD_INIT, "sd", "SD Python integration", -1,
+  sd_methods, NULL, NULL, NULL, NULL
+};
+
+PyMODINIT_FUNC PyInit_sd(void)
+{
+  return PyModule_Create(&sd_module);
+}
+
+static int sd_py_gui_step(void)
+{
+  PyObject *gui_step;
+  PyObject *result;
+
+  gui_step = PyMapping_GetItemString(global_dict, "gui_step");
+  if (gui_step == NULL)
+    return SD_PyErr_GuiError;
+
+  result = PyObject_CallNoArgs(gui_step);
+  Py_DECREF(gui_step);
+  if (result == NULL) {
+    PyErr_Print();
+    return SD_PyErr_GuiError;
+  }
+
+  Py_DECREF(result);
+  return 0;
+}
+
+static int sd_py_poll(void)
+{
+  SD_EVENT *event;
+  char result[SD_EVENT_NAME_SIZE + SD_EVENT_PAYLOAD_SIZE + 2];
+
+  sd_event_drain_wakeup();
+  event = sd_event_dequeue();
+  if (event == NULL) {
+    k_put_c_string("", e_stack);
+    e_stack++;
+    process.status = SD_PyErr_EventEmpty;
+    sd_python_event_clear();
+    return SD_PyErr_EventEmpty;
+  }
+
+  if (snprintf(result, sizeof(result), "%s%c%s",
+               event->name, FIELD_MARK, event->payload) >=
+      (int)sizeof(result)) {
+    free(event);
+    k_put_c_string("", e_stack);
+    e_stack++;
+    process.status = SD_PyErr_EventTooBig;
+    return SD_PyErr_EventTooBig;
+  }
+
+  free(event);
+  k_put_c_string(result, e_stack);
+  e_stack++;
+  process.status = 0;
+
+  if (sd_python_event_count() == 0)
+    sd_python_event_clear();
+
+  return 0;
+}
+
 void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
 
   FILE *pyfd;         /* file descriptor for python script file */
@@ -114,6 +428,18 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
 
     case SD_PyInit: /* Initialize python */
       if (!Py_IsInitialized()) {  /* only initialize if not already so */
+        myResult = sd_event_queue_init();
+        if (myResult != 0)
+          break;
+
+        if (!sd_module_registered) {
+          if (PyImport_AppendInittab("sd", &PyInit_sd) == -1) {
+            myResult = SD_PyErr_MainMod;
+            break;
+          }
+          sd_module_registered = TRUE;
+        }
+
         Py_Initialize();          /* There is no return value; it is a fatal error if the initialization fails. */
        /* "dictionaries that serve as namespaces for running code are generally required 
         to have a __builtins__ link to the built-in scope searched last for name lookups"
@@ -131,7 +457,17 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
             if (global_dict == NULL) {
               PyErr_Print();
               myResult = SD_PyErr_GlobDict;  /* could get __main__ dictionary bad news! */
-            } 
+            }
+
+            if (myResult == 0) {
+              PyObject *sd_module = PyImport_ImportModule("sd");
+              if (sd_module == NULL) {
+                PyErr_Print();
+                myResult = SD_PyErr_MainMod;
+              } else {
+                Py_DECREF(sd_module);
+              }
+            }
 
           }
 
@@ -150,6 +486,7 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
       /* rem  global_dict, main_module are Borrowed Reference  */
                   
       if (Py_IsInitialized()) {  /* only finalize if previously initialized */
+        sd_event_queue_shutdown();
         myResult = Py_FinalizeEx();
       } else {
         myResult = 0; 
@@ -168,6 +505,26 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
 
       InitDescr(e_stack, INTEGER);
       (e_stack++)->data.value = (int32_t)myResult;
+      break;
+
+    case SD_PyGuiStep:
+      if (Py_IsInitialized())
+        myResult = sd_py_gui_step();
+      else
+        myResult = SD_PyEr_NotInit;
+      process.status = myResult;
+      InitDescr(e_stack, INTEGER);
+      (e_stack++)->data.value = (int32_t)myResult;
+      break;
+
+    case SD_PyPoll:
+      if (Py_IsInitialized())
+        (void)sd_py_poll();
+      else {
+        process.status = SD_PyEr_NotInit;
+        k_put_c_string(nullresult, e_stack);
+        e_stack++;
+      }
       break;
 
 
