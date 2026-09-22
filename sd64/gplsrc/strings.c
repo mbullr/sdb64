@@ -17,6 +17,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  * 
  * START-HISTORY:
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * 31 Dec 23 SD launch - prior history suppressed
  * END-HISTORY
  *
@@ -89,10 +90,11 @@ char* alloc_c_string(DESCRIPTOR* descr) {
   STRING_CHUNK* str;
 
   if ((str = descr->data.str.saddr) == NULL) {
-    p = (char*)k_alloc(39, 1);
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    p = (char*)ksafe_alloc(39, 1);
     *p = '\0';
   } else {
-    p = (char*)k_alloc(40, (str->string_len) + 1);
+    p = (char*)ksafe_alloc(40, (str->string_len) + 1);
     if (p != NULL) {
       q = p;
       if ((str = descr->data.str.saddr) != NULL) {
@@ -115,7 +117,8 @@ char* dupstring(char* str) {
   char* s;
 
   if (str != NULL) {
-    s = (char*)k_alloc(108, strlen(str) + 1);
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    s = (char*)ksafe_alloc(108, strlen(str) + 1);
     strcpy(s, str);
     return s;
   } else
@@ -175,8 +178,8 @@ STRING_CHUNK* s_alloc(
   }
 
   reqd_size = ((u_int16_t)size) + sizeof(struct STRING_CHUNK) - 1;
-
-  p = (STRING_CHUNK*)k_alloc(2, reqd_size);
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  p = (STRING_CHUNK*)ksafe_alloc(2, reqd_size);
 
 allocated_from_cache:
 
@@ -257,8 +260,8 @@ STRING_CHUNK* s_make_contiguous(STRING_CHUNK* old_str, int16_t* errnum) {
 
   reqd_size =
       (int16_t)(old_str->string_len + sizeof(struct STRING_CHUNK) - 1);
-
-  new_str = (STRING_CHUNK*)k_alloc(2, reqd_size);
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  new_str = (STRING_CHUNK*)ksafe_alloc(2, reqd_size);
   new_str->next = NULL;
   new_str->field = 0; /* No active hint */
   new_str->alloc_size = (int16_t)(old_str->string_len);
@@ -301,7 +304,8 @@ void setstring(char** strptr, char* string) {
   }
 
   if (string != NULL) {
-    *strptr = (char*)k_alloc(36, strlen(string) + 1);
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    *strptr = (char*)ksafe_alloc(36, strlen(string) + 1);
     strcpy(*strptr, string);
   }
 }

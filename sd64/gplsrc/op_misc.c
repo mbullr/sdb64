@@ -17,6 +17,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  * 
  * START-HISTORY:
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * rev 1.0-1 mab add op_procread back in per user request
  * 06 Aug 24 mab remove op_procread
  * 02 Aug 24 mab correct format code in op_dtx
@@ -957,7 +958,8 @@ void op_sendmail() {
   k_get_string(descr);
   if (descr->data.str.saddr != NULL) {
     bytes = descr->data.str.saddr->string_len;
-    attachments = k_alloc(77, bytes + 1);
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    attachments = ksafe_alloc(77, bytes + 1);
     k_get_c_string(descr, attachments, bytes);
   }
 
@@ -970,7 +972,8 @@ void op_sendmail() {
     text = null_string;
   } else {
     text_bytes = descr->data.str.saddr->string_len;
-    text = k_alloc(76, text_bytes + 1);
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    text = ksafe_alloc(76, text_bytes + 1);
     k_get_c_string(descr, text, text_bytes);
   }
 
@@ -988,7 +991,8 @@ void op_sendmail() {
   k_get_string(descr);
   if (descr->data.str.saddr != NULL) {
     bytes = descr->data.str.saddr->string_len;
-    bcc_recipients = k_alloc(78, bytes + 1);
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    bcc_recipients = ksafe_alloc(78, bytes + 1);
     k_get_c_string(descr, bcc_recipients, bytes);
   }
 
@@ -998,7 +1002,8 @@ void op_sendmail() {
   k_get_string(descr);
   if (descr->data.str.saddr != NULL) {
     bytes = descr->data.str.saddr->string_len;
-    cc_recipients = k_alloc(78, bytes + 1);
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    cc_recipients = ksafe_alloc(78, bytes + 1);
     k_get_c_string(descr, cc_recipients, bytes);
   }
 
@@ -1008,7 +1013,8 @@ void op_sendmail() {
   k_get_string(descr);
   if (descr->data.str.saddr != NULL) {
     bytes = descr->data.str.saddr->string_len;
-    recipients = k_alloc(78, bytes + 1);
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    recipients = ksafe_alloc(78, bytes + 1);
     k_get_c_string(descr, recipients, bytes);
   }
 

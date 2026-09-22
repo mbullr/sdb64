@@ -18,6 +18,7 @@
  *
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -3246,8 +3247,8 @@ int oconv_d(int dt,     /* Date value to convert */
           q = sysmsg(1502);
           if (strdcount(q, ',') != 31)
             continue; /* Omit element */
-
-          ordinals[0] = (char*)k_alloc(89, strlen(q) + 1);
+          // rev 1.0-3 use ksafe_alloc if results not tested
+          ordinals[0] = (char*)ksafe_alloc(89, strlen(q) + 1);
           strcpy(ordinals[0], q);
           (void)strtok(ordinals[0], ",");
           for (j = 1; j < 31; j++)

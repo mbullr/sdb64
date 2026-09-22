@@ -18,6 +18,7 @@
  *
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -340,8 +341,8 @@ void op_objref() {
 
 OBJDATA* create_objdata(u_char* obj) {
   OBJDATA* objdata;
-
-  objdata = (OBJDATA*)k_alloc(112, sizeof(OBJDATA));
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  objdata = (OBJDATA*)ksafe_alloc(112, sizeof(OBJDATA));
   objdata->ref_ct = 1;
   objdata->objprog = obj;
   objdata->name_map = NULL;
@@ -467,8 +468,9 @@ Private bool find_undefined_name_handler(int16_t mode,
           InitDescr(e_stack, OBJCDX);
           e_stack->n1 = key;
           e_stack->data.objundef.objdata = scanobj;
+          // rev 1.0-3 use ksafe_alloc if results not tested
           e_stack->data.objundef.undefined_name =
-              (char*)k_alloc(113, strlen(name) + 1);
+              (char*)ksafe_alloc(113, strlen(name) + 1);
           strcpy(e_stack->data.objundef.undefined_name, name);
           e_stack++;
           return TRUE;

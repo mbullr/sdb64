@@ -17,6 +17,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  * 
  * START-HISTORY:
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * rev 0.9-3 mab map_t1_id - map ~ to %T and . to %D (consistent with what dir_select in op_dio4.c)
  * rev 0.9.0 Jan 25 mab change dyn file prefix to %
  * 01 Jul 24 mab define max string size.
@@ -1470,7 +1471,7 @@ exit_dir_write:
 Private void t1_buffer_alloc(int32_t size) {
   if (size > MAX_T1_BUFFER_SIZE)
     size = MAX_T1_BUFFER_SIZE;
-  t1_buffer = (char *)k_alloc(8, size);
+  t1_buffer = (char *)ksafe_alloc(8, size);
   t1_ptr = t1_buffer;
   t1_buffer_size = size;
   t1_space = (int16_t)size;

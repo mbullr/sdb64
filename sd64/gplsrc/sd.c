@@ -281,7 +281,8 @@ Private void sd_init(int argc, char *argv[]) {
   /* Save the current working directory for use by SYSTEM(1024) */
 
   (void)getcwd(cwd, MAX_PATHNAME_LEN);
-  entry_dir = k_alloc(MAX_PATHNAME_LEN, strlen(cwd) + 1); /* was hard coded at 110 -gwb */
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  entry_dir = ksafe_alloc(109, strlen(cwd) + 1); /* was hard coded at 110 -gwb */
   strcpy(entry_dir, cwd);
 }
 
@@ -456,8 +457,8 @@ Private bool comlin(int argc, char *argv[]) {
     for (n = arg; n < argc; n++) {
       bytes += strlen(argv[n]) + 1;
     }
-
-    single_command = k_alloc(109, bytes);
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    single_command = ksafe_alloc(109, bytes);
     n = 0;
     while (1) {
       strcpy(single_command + n, argv[arg]);

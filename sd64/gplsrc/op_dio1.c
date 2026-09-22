@@ -19,6 +19,7 @@
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
  * rev 0.9.0 Jan 25 mab change dyn file prefix to % 
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -779,8 +780,8 @@ Private void open_file(bool map_name) /* Map file name via VOC entry */
           break;
       }
       i++;
-
-      ak_ctrl = (AK_CTRL*)k_alloc(58, AkCtrlSize(i));
+      // rev 1.0-3 use ksafe_alloc if results not tested
+      ak_ctrl = (AK_CTRL*)ksafe_alloc(58, AkCtrlSize(i));
       fvar->access.dh.ak_ctrl = ak_ctrl;
       while (i-- > 0) {
         ak_ctrl->ak_scan[i].upd = 0;

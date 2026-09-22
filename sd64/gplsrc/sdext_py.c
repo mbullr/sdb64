@@ -20,6 +20,7 @@
  * 
  * START-HISTORY:
  * rev 1.0-3 mab move #include "sdext_python_inc.h"  to first include
+ *              the way python finalize was designed a user could cause a seqfault
  * rev 0.9-2 Mar 25 mab add sdext_pyobj direct control of python dictionary object
  * rev 0.9.0 Jan 25 mab use install script created file sdext_python_inc.h to tell us where to find python headers
  * 11 Aug 2024 mab add PyErr_Print() to file and string script execution failure

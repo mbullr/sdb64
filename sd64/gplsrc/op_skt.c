@@ -17,6 +17,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  * 
  * START-HISTORY:
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * rev 0.9-3 SIGPIPE Error in op_writeskt() (WRITE.SOCKET)  issue #89 / ScarletDME 
  * 31 Dec 23 SD launch - prior history suppressed
  * END-HISTORY
@@ -198,8 +199,8 @@ void op_accptskt() {
   skt = accept(srvr_skt, (struct sockaddr*)&sinRemote, &socklen);
 
   /* Create socket descriptor and SOCKVAR structure */
-
-  sock = (SOCKVAR*)k_alloc(100, sizeof(SOCKVAR));
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  sock = (SOCKVAR*)ksafe_alloc(100, sizeof(SOCKVAR));
   sock->ref_ct = 1;
   sock->socket_handle = (int)skt;
   sock->flags = SKT_INCOMING;
@@ -430,7 +431,8 @@ void op_openskt() {
   /* Create socket descriptor and SOCKVAR structure */
 
   if (process.status == 0) {
-    sock = (SOCKVAR*)k_alloc(97, sizeof(SOCKVAR));
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    sock = (SOCKVAR*)ksafe_alloc(97, sizeof(SOCKVAR));
     sock->ref_ct = 1;
     sock->socket_handle = (unsigned int)skt;
     sock->family = res->ai_family;
@@ -997,8 +999,8 @@ void op_srvrskt() {
     } else {
       listen(skt, SOMAXCONN);
       /* Create socket descriptor and SOCKVAR structure */
-
-      sock = (SOCKVAR*)k_alloc(99, sizeof(SOCKVAR));
+      // rev 1.0-3 use ksafe_alloc if results not tested
+      sock = (SOCKVAR*)ksafe_alloc(99, sizeof(SOCKVAR));
       sock->ref_ct = 1;
       sock->socket_handle = (int)skt;
       sock->family = res->ai_family;

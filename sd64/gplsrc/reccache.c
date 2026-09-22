@@ -17,6 +17,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  * 
  * START-HISTORY:
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * 31 Dec 23 SD launch - prior history suppressed
  * END-HISTORY
  *
@@ -55,7 +56,8 @@ void init_record_cache() {
   /* Expand cache */
 
   while (rec_cache_size < pcfg.reccache) {
-    p = (REC_CACHE_ENTRY*)k_alloc(71, sizeof(REC_CACHE_ENTRY));
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    p = (REC_CACHE_ENTRY*)ksafe_alloc(71, sizeof(REC_CACHE_ENTRY));
     p->next = NULL;
     p->prev = rec_cache_tail;
     p->file_no = -1;

@@ -18,6 +18,7 @@
  *
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -249,7 +250,8 @@ found:
 
   object_items++;
   object_total += object_bytes;
-  obj = (OBJECT*)k_alloc(22, OBJHDRSIZE + object_bytes);
+  // rev 1.0-3 use ksafe_alloc if results not tested 
+  obj = (OBJECT*)ksafe_alloc(22, OBJHDRSIZE + object_bytes);
 
   obj->cp_time = 0;
   obj->calls = (hsm) ? 1 : 0;
@@ -544,7 +546,8 @@ Private void hsm_log(OBJECT* obj) {
   /* Not found - Make a new entry */
 
   bytes = sizeof(HSM) + strlen(obj->code.ext_hdr.prog.program_name);
-  p = (HSM*)k_alloc(91, bytes);
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  p = (HSM*)ksafe_alloc(91, bytes);
   p->next = hsm_head;
   hsm_head = p;
 
