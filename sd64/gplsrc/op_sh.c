@@ -18,6 +18,7 @@
  * 
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3 use ksafe_alloc if results not tested 
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -111,8 +112,8 @@ Private void sh(bool capture) {
   } else {
     if (cmd_str != NULL)
       k_free(cmd_str); /* From an earlier k_error() */
-
-    cmd_str = k_alloc(111, bytes + MAX_PATHNAME_LEN + 10); /* Allow for strcat on Windows */
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    cmd_str = ksafe_alloc(111, bytes + MAX_PATHNAME_LEN + 10); /* Allow for strcat on Windows */
     k_get_c_string(descr, cmd_str, bytes);
     k_dismiss();
 

@@ -17,6 +17,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  * 
  * START-HISTORY:
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * 31 Dec 23 SD launch - prior history suppressed
  * END-HISTORY
  *
@@ -80,7 +81,8 @@ void op_txnbgn() {
 
   if (process.txn_id != 0) /* Nested transaction */
   {
-    stk = (TXN_STACK*)k_alloc(81, sizeof(TXN_STACK));
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    stk = (TXN_STACK*)ksafe_alloc(81, sizeof(TXN_STACK));
     stk->next = txn_stack;
     stk->txn_id = process.txn_id;
     stk->cproc_level = cproc_level;

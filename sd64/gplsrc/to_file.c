@@ -17,6 +17,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  * 
  * START-HISTORY:
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * 31 Dec 23 SD launch - prior history suppressed
  * END-HISTORY
  *
@@ -207,8 +208,8 @@ Private void start_file(PRINT_UNIT* pu) {
   }
 
   /* Allocate buffer */
-
-  pu->buff = (char*)k_alloc(41, FILE_BUFF_SIZE);
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  pu->buff = (char*)ksafe_alloc(41, FILE_BUFF_SIZE);
   pu->bytes = 0;
   pu->flags |= PU_ACTIVE;
   pu->flags |= PU_HDR_NEXT;

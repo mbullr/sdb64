@@ -18,6 +18,7 @@
  * 
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -1355,8 +1356,8 @@ void op_pmatrix() {
 
   descr = process.program.vars + (*pc + (*(pc + 1) << 8));
   pc += 2;
-
-  pm_hdr = (PMATRIX_HEADER*)k_alloc(85, sizeof(PMATRIX_HEADER));
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  pm_hdr = (PMATRIX_HEADER*)ksafe_alloc(85, sizeof(PMATRIX_HEADER));
   InitDescr(descr, PMATRIX);
   descr->data.pmatrix = pm_hdr;
 

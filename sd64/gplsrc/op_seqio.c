@@ -19,6 +19,7 @@
  * START-HISTORY:
  * 31 Dec 23 SD launch - prior history suppressed
  * rev 0.9.0 Jan 25 mab change dyn file prefix to % 
+ * rev 1.0-3 use ksafe_alloc if results not tested
  * END-HISTORY
  *
  * START-DESCRIPTION:
@@ -683,7 +684,8 @@ Private void openseq(bool map_name) {
   sq_file->line = 1;
   sq_file->record_name = NULL;
   sq_file->pathname = NULL;
-  sq_file->buff = (char*)k_alloc(33, SEQ_BUFFER_SIZE);
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  sq_file->buff = (char*)ksafe_alloc(33, SEQ_BUFFER_SIZE);
   sq_file->base = -1;
   sq_file->timeout = -1;
   sq_file->flags = flags;

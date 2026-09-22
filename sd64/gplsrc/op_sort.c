@@ -17,6 +17,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  * 
  * START-HISTORY:
+ * rev 1.0-3 use ksafe_alloc if results not tested 
  * rev 0.9.0 Jan 25 mab catch null key id in op_sortdata()
  * 31 Dec 23 SD launch - prior history suppressed
  * END-HISTORY
@@ -228,7 +229,8 @@ void op_sortadd() {
     str = descr->data.str.saddr;
     if (str != NULL) {
       bytes = str->string_len + 1;
-      p = (char*)k_alloc(115, bytes);
+      // rev 1.0-3 use ksafe_alloc if results not tested
+      p = (char*)ksafe_alloc(115, bytes);
       k_get_c_string(descr, p, str->string_len);
       new_bte->key[index] = p;
       size += (bytes + 3) & ~1;
@@ -250,8 +252,9 @@ void op_sortadd() {
     GetString(descr);
     str = descr->data.str.saddr;
     if (str != NULL) {
+      // rev 1.0-3 use ksafe_alloc if results not tested
       bytes = str->string_len + 1;
-      p = (char*)k_alloc(116, bytes);
+      p = (char*)ksafe_alloc(116, bytes);
       k_get_c_string(descr, p, str->string_len);
       new_bte->data = p;
       size += (bytes + 1) & ~1;
@@ -679,7 +682,8 @@ void op_sortnext() {
       sort_buff_offset += (bytes + 1) & ~1;
     } else /* Must use a temporary buffer */
     {
-      buff = (char*)k_alloc(65, bytes);
+      // rev 1.0-3 use ksafe_alloc if results not tested
+      buff = (char*)ksafe_alloc(65, bytes);
       q = buff;
 
       while (bytes) {
@@ -805,8 +809,8 @@ Private bool sortmerge() {
   sort_fu = dio_open(pathname, DIO_READ);
   if (!ValidFileHandle(sort_fu))
     goto exit_sortmerge;
-
-  sort_buff = (char*)k_alloc(64, DISK_BUFFER_SIZE);
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  sort_buff = (char*)ksafe_alloc(64, DISK_BUFFER_SIZE);
   sort_buff_bytes = 0;
   sort_buff_offset = 0;
 
@@ -852,8 +856,8 @@ Private bool flush_sort_tree() {
   fu = dio_open(pathname, DIO_REPLACE);
   if (!ValidFileHandle(fu))
     k_error(sysmsg(1491), pathname, OSError);
-
-  disk_buffer = (char*)k_alloc(63, DISK_BUFFER_SIZE);
+  // rev 1.0-3 use ksafe_alloc if results not tested
+  disk_buffer = (char*)ksafe_alloc(63, DISK_BUFFER_SIZE);
   used_bytes = 0;
 
   bte = sort_tree;
@@ -879,7 +883,8 @@ Private bool flush_sort_tree() {
       if (assembly_buffer != NULL)
         k_free(assembly_buffer);
       assembly_buffer_size = (bytes + 1023) & ~1023;
-      assembly_buffer = (char*)k_alloc(62, assembly_buffer_size);
+      // rev 1.0-3 use ksafe_alloc if results not tested
+      assembly_buffer = (char*)ksafe_alloc(62, assembly_buffer_size);
     }
 
     /* Assemble record */
@@ -1038,7 +1043,8 @@ Private bool merge_sort_files() {
 
   for (i = 0; i < pcfg.sortmrg; i++) {
     infu[i] = INVALID_FILE_HANDLE;
-    buff[i] = (char*)k_alloc(66, DISK_BUFFER_SIZE);
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    buff[i] = (char*)ksafe_alloc(66, DISK_BUFFER_SIZE);
   }
 
   while (num_files > 1) {
@@ -1075,8 +1081,8 @@ Private bool merge_sort_files() {
     outfu = dio_open(pathname, DIO_REPLACE);
     if (!ValidFileHandle(outfu))
       goto exit_merge_sort_files;
-
-    outbuff = (char*)k_alloc(66, DISK_BUFFER_SIZE);
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    outbuff = (char*)ksafe_alloc(66, DISK_BUFFER_SIZE);
     outbuff_bytes = 0;
 
     ndata = nstream;
@@ -1287,7 +1293,8 @@ Private char* read_merge_record(
     offset += bytes;
   } else /* Must use a temporary buffer */
   {
-    rec = (char*)k_alloc(67, bytes);
+    // rev 1.0-3 use ksafe_alloc if results not tested
+    rec = (char*)ksafe_alloc(67, bytes);
     *temp = TRUE;
 
     q = rec;
