@@ -66,21 +66,6 @@ Read , lines 362 to 375
 Generating patch (33 lines) in , , , 
 
 
-```
-
-```
-
-```
-
-```
-
-```
-
-```
-
-```
-
-```
 The first slice is in place: operation keys and errors are defined, dispatch recognizes both operations, and the shutdown prototype mismatch is fixed. I’m running the focused error check now before adding the larger `sdext_py.c` implementation.
 
 Checked , , , , no problems found
@@ -90,17 +75,8 @@ The focused validation passed. I’m now adding the queue implementation to `sde
 Generating patch (263 lines) in 
 
 
-```
-
-```
-
-
 Generating patch (128 lines) in 
 
-
-```
-
-```
 The bridge implementation is now present: `sd.post_event()` copies data into the queue, `SD_PyGuiStep` calls a persistent Python `gui_step()`, and `SD_PyPoll` returns one field-marked event. I’m validating this touched source now; any issues here will be fixed before wiring `linuxio.c`.
 
 Checked , no problems found
@@ -110,9 +86,6 @@ The bridge source validates cleanly. I’m wiring `linuxio.c` to monitor the Pyt
 Generating patch (67 lines) in 
 
 
-```
-
-```
 `linuxio.c` now uses only `poll()` and watches both the requested descriptor and the Python wakeup descriptor, without re-entering the VM. I’m running the focused post-edit diagnostics across all C files touched so far before adding the Tkinter sample assets.
 
 Checked , , , , , , no problems found
@@ -148,17 +121,6 @@ Ran terminal command:  gcc -std=gnu99 -Dbool=sd_bool -fsyntax-only -DEMBED_PYTHO
 The modern syntax check passes when compiled with `-std=gnu99 -Dbool=sd_bool`, which matches this legacy project’s custom boolean type and avoids Python’s `bool` macro collision. I also spotted one runtime polish issue: the wake pipe must be drained when `sdpoll()` notices it, otherwise blocking input can repeatedly wake on the same byte; I’m adding that drain hook and public declarations now.
 
 Generating patch (34 lines) in , , 
-
-
-```
-
-```
-
-```
-
-```
-
-```
 
 ```
 The wakeup pipe is now drained after detection, so it acts as a notification rather than a permanent readable condition. I’m performing the final validation pass: editor diagnostics, modern/legacy C syntax checks, Python syntax checks, and a scoped diff review.

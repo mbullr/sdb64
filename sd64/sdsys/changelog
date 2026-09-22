@@ -1,11 +1,17 @@
 Version 1.0-3
 -------------
-(mab)  There are an abundance of instances where sd does not check for successful memory allocation via malloc.
+(mab)  Added cooperative scheduler between the VM and python. Description is found in SD GUI Python cooperative scheduling.txt in
+         Documentation folder.
+         Allows both Python GUI (Tkinter) and BASIC program to both remain response with Gui window open.  This is very BETA!!!
+         See SD_TK_DEMO.BP program in sd64/examples/python/embedded_python/BP.
+       Fixed bug with Python finalization that could cause segfault (sdext_py.c) 
+       There are an abundance of instances where sd does not check for successful memory allocation via malloc.
          Create function safe_malloc which on memory allocation failure reports to stderr and terminates sd with exit(EX_OSERR).
          This is not an ideal situation but halting the program gracefully is probably better than the eventual segfault.
          For places where k_alloc is used, if there is a test for successful memory allocation leave as is and assume original author's logic is correct.
          If k_alloc is not protected, switch to using ksafe_alloc which causes a k_error("some message about allocation failure").
            Assume we can use K_error because kernel is up and running, this results in a clean stop of the system.
+         Note added program KTAG to BP which was used to parse the gplsrc c code and locate K_ALLOC (now needs mod to also fine KSAFE_ALLOC) and create KTAG file and then KTAG.csv. End result is a listing of c source files and the TAG number which id's the memmory allocation.  May someday be used for debug purpose (maybe the original reason for it being found in the macro???).
        gplsrc sysseg.c start_sd() treats a failed fork() as success, and the daemon dies silently
        gplscr sdlnxd.c don't fail silently when attempting to access semaphores
        gplsrc sp_str4.c op_trimx had int variable skip_count defined as bool (worked because of bool typed as int, but will not work for c2x).

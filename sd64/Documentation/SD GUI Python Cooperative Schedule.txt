@@ -1,0 +1,173 @@
+Provide a summary of how the cooperative scheduling works between the VM and python
+===================================================================================
+I’ve narrowed it to the SD extension layer and the event queue; I’m summarizing the actual handoff pattern the code uses rather than the general CPython model.
+
+Searched for regex `sd_python_event_fd\(|SD_PyPoll|post_event\(|gui_step|sd_python_event_ready\(` (`**/*.{c,h}`), 19 results
+
+Read , lines 780 to 859
+
+Read , lines 220 to 280
+
+## Cooperative scheduling model
+
+This is a cooperative handoff, not a true multithreaded Python runtime.
+
+### 1) The VM owns the main execution loop
+The SD runtime polls I/O through `sdpoll()` in `linuxio.c:791-831`. That function includes a Python event pipe in the poll set:
+
+- `sd_python_event_fd()` is added to the poll list
+- if the fd becomes readable, `sd_python_event_ready()` and `sd_python_event_drain()` are triggered
+
+This means the SD VM is the one deciding when to wake up and check whether Python has queued something.
+
+### 2) Python only runs when SD explicitly calls it
+The embedded Python bridge lives in `sdext_py()` in `sdext_py.c:321-589`. It handles commands like:
+
+- `SD_PyInit`
+- `SD_PyRunStr`
+- `SD_PyRunFile`
+- `SD_PyGetAtt`
+- `SD_PyGuiStep`
+- `SD_PyPoll`
+
+Those are invoked from the SD extension dispatcher in `op_sdext.c:245-264`. There is no background Python loop spinning in parallel.
+
+### 3) The handoff is event-driven
+Python pushes work into the SD event queue via the `sd` module method `post_event()` in `sdext_py.c:296-353`:
+
+- event is queued with a mutex-protected linked list
+- a byte is written into a pipe
+- the SD poll loop sees the pipe readable
+- then `SD_PyPoll` dequeues the event and returns it to SD
+
+So the flow is roughly:
+
+- Python calls `sd.post_event(...)`
+- queue is filled
+- pipe is written
+- VM poll notices fd activity
+- VM executes `SD_PyPoll`
+- VM passes event back to the BASIC/SD side
+
+### 4) Why this is cooperative
+The code does not create a separate Python execution thread, and there is no `Py_BEGIN_ALLOW_THREADS` / `PyEval_InitThreads` pattern here. Python is initialized once with `Py_Initialize()` in `sdext_py.c:430-483`, and then all Python API calls happen in the same SD execution context.
+
+That means:
+
+- SD does work
+- SD calls into Python
+- Python executes
+- control returns to SD
+- SD continues its loop
+- the next time the poll loop notices an event, Python work resumes
+
+This is cooperative scheduling by explicit yield points, not preemptive scheduling.
+
+### 5) Practical effect
+The design is safe for embedded use because the VM is the scheduler:
+
+- no independent Python thread is racing the VM
+- no parallel execution of SD and Python code at the same time
+- communication happens through a queue and a pipe, with the VM acting as the coordinator
+
+If you want, I can also sketch the exact call sequence for a “Python posts an event -> SD handles it” round trip.
+
+=============================================================================
+Please provide a Sketch of the call sequence
+=============================================================================
+
+## Sketch of the call sequence
+
+Here is the round-trip flow as implemented in this codebase.
+
+### A. Python wants to notify SD
+1. Python code calls the exported module method `sd.post_event(name, payload)`.
+2. That method is defined in `sdext_py.c:296-353`.
+3. `sd_post_event()` calls `sd_event_enqueue(name, payload)`.
+4. `sd_event_enqueue()`:
+   - allocates an `SD_EVENT`
+   - locks `sd_event_queue.mutex`
+   - appends to the linked list
+   - increments the queue count
+   - unlocks
+   - calls `sd_python_event_ready()`
+   - writes one byte to the event pipe via `write(...)`
+
+The key wakeup is here:
+- `sdext_py.c:146-185` for queue setup
+- `sdext_py.c:186-232` for enqueue and wakeup
+
+---
+
+### B. SD notices the Python event
+5. SD’s main poll loop calls `sdpoll()` in `linuxio.c:791-831`.
+6. `sdpoll()` adds the Python event fd to the `pollfd` list.
+7. When that fd is readable, it does:
+   - `sd_python_event_ready()`
+   - `sd_python_event_drain()`
+8. Then the VM continues its normal processing, and when it is ready to consume the Python event it executes:
+   - `SD_PyPoll` via the extension dispatch in `op_sdext.c:245-264`
+
+---
+
+### C. SD consumes the queued Python event
+9. `SD_PyPoll` dispatches to `sdext_py(key, ...)` in `sdext_py.c:365-420` and ends up in the `case SD_PyPoll:` branch.
+10. `sd_py_poll()` does:
+   - `sd_event_drain_wakeup()`
+   - `sd_event_dequeue()`
+   - formats `name + FIELD_MARK + payload`
+   - puts the result onto the SD stack with `k_put_c_string(...)`
+   - sets `process.status = 0`
+11. The result is returned to the BASIC/VM side as a normal SD stack value.
+
+---
+
+### D. Python execution from SD
+For direct SD-to-Python calls, the path is simpler:
+
+1. SD extension function dispatch hits `SD_PyRunStr`, `SD_PyRunFile`, `SD_PyGetAtt`, etc. in `op_sdext.c:245-264`
+2. That calls `sdext_py(...)`
+3. In `sdext_py()`:
+   - `case SD_PyRunStr`: executes `PyRun_String(...)` in `sdext_py.c:529-549`
+   - `case SD_PyRunFile`: executes `PyRun_File(...)` in `sdext_py.c:550-576`
+   - `case SD_PyGetAtt`: reads from `global_dict` using `PyMapping_GetItemString(...)` in `sdext_py.c:577-589`
+
+---
+
+## Compact flow
+
+Python side:
+`Python code -> sd.post_event(...) -> sd_event_enqueue() -> write(pipe)`
+
+VM side:
+`poll() sees pipe -> SD_PyPoll -> sd_py_poll() -> dequeue event -> return string to SD`
+
+And for explicit calls:
+`SD extension dispatch -> sdext_py() -> PyRun_String / PyRun_File / PyMapping_GetItemString`
+
+> The important point is that the VM remains the scheduler and the Python engine is invoked only at explicit SD call points, with Python-to-SD communication mediated by the event queue.
+
+=============================================================
+Is the sd code and the python code run in the same thread?
+=============================================================
+## Short answer
+
+Yes — in this implementation, the SD runtime and the embedded Python code are effectively run on the same thread unless something else explicitly creates a separate thread.
+
+### Why this is the case
+- The Python interpreter is initialized inside the same `sdext_py()` function when the `SD_PyInit` case runs: `sdext_py.c:430-483`
+- Later, Python execution is triggered from that same function via calls like `PyRun_String()`, `PyRun_File()`, and `PyMapping_GetItemString()`: `sdext_py.c:509-589`
+- There is no `Py_BEGIN_ALLOW_THREADS`, no `PyEval_InitThreads()`, and no `pthread_create()` for running Python in a separate worker thread in this file. The only threading-related code here is `pthread_mutex_t` around the event queue, which is for synchronization, not for executing Python on another thread: `sdext_py.c:92-174`
+
+### Important nuance
+The code does use a queue and wakeup mechanism for SD/Python events:
+- `sd_event_queue_init()`
+- `sd_event_enqueue()`
+- `sd_python_event_ready()`
+- `sd_py_poll()`
+
+But those are still just callbacks and queue operations; they do not create a second Python execution thread. The event queue is synchronized with `pthread_mutex_t`, but the actual Python C API calls still happen in the current SD execution context.
+
+> In other words: this is embedded Python, not a separate Python worker thread.
+
+If you want, I can also point out the exact call path that shows how an SD BASIC extension triggers Python and where the GIL would be held.
