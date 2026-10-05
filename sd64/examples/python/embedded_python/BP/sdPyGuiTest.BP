@@ -82,13 +82,13 @@ LOOP WHILE DONE = 0
               
                 Key_list = '-UNAME-':@VM: '-DOB-' :@VM :'-ACCOUNT-' :@VM: "-TEXTBX-"
                 Value_list = 'UserName':@VM: 'Birth Date' :@VM :'' :@VM: EVENT.DATA 
-                result = PY_GUIWINUPDATES("window",Key_list,Value_list)   
+                result = PY_GUIWINUPDATES("main_window",Key_list,Value_list)   
               
-                *result = PY_GUIWINUPDATE("window","-TEXTBX-",EVENT.DATA)
+                *result = PY_GUIWINUPDATE("main_window","-TEXTBX-",EVENT.DATA)
                 crt "window update result: ":result
               end
               
-              IF EVENT.NAME = "window" AND EVENT.DATA = "closed" THEN
+              IF EVENT.NAME = "main_window" AND EVENT.DATA = "closed" THEN
                 DONE = 1
               END
             end
