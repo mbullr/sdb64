@@ -1,13 +1,18 @@
 * sdPyGuiTest.BP
 * playing with freesimplegui.py and testing the cooperative scheduler
-* rem must start sd with -internal flag and compiler option must be set
+* To do:
+* We should define windows within a function to ensure objects used during creation (the layout) get garbage collected
+*  (the _setup.py script)
+* Because we are running embedded within the sd app and it is possible the sd process could be alive for long periods of
+*  time, we should clean up (set to None) any objects created either within the _setup.py or _step.py script.
+* Also at some point the sd Python function PY_PYGUISTEP()  (sd_py_gui_step in sdext_py.c) should be passed the name of #  *   the function defined in the _step.py script (in this example gui_step).  Currently it is hardcoded. 
 **$internal
 $include KEYS.H
 $include SDPYFUNC.H
 
 * rem to point these to where you save the python scripts
-SETUP.FILE = "/home/sd/user_accounts/mabull/BP/sdPyGui_setup.py"
-STEP.FILE = "/home/sd/user_accounts/mabull/BP/sdPyGui_step.py"
+SETUP.FILE = "/home/sd/user_accounts/mabull/BP/sdPyGui_setup2.py"
+****STEP.FILE = "/home/sd/user_accounts/mabull/BP/sdPyGui_step.py"
 
 STATUS.VALUE = PY_INITIALIZE()
 IF STATUS() # 0 THEN
@@ -16,13 +21,13 @@ IF STATUS() # 0 THEN
 END
 
 CRT "Python initialized"
-CRT "Setup gui_step function"
-
-STATUS.VALUE = PY_RUNFILE(STEP.FILE)
-IF STATUS() # 0 THEN
-    crt "PyGui step setup failed: ":STATUS()
-    GOTO SHUTDOWN
-END
+**CRT "Setup gui_step function"
+**
+**STATUS.VALUE = PY_RUNFILE(STEP.FILE)
+**IF STATUS() # 0 THEN
+**    crt "PyGui step setup failed: ":STATUS()
+**    GOTO SHUTDOWN
+**END
 
 CRT "Setup Gui Window"
 
