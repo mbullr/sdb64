@@ -11,7 +11,7 @@ $include KEYS.H
 $include SDPYFUNC.H
 
 * rem to point these to where you save the python scripts
-SETUP.FILE = "/home/sd/user_accounts/mabull/BP/sdPyGui_setup2.py"
+SETUP.FILE = "/home/sd/user_accounts/mabull/BP/sdPyGui_setup.py"
 ****STEP.FILE = "/home/sd/user_accounts/mabull/BP/sdPyGui_step.py"
 
 STATUS.VALUE = PY_INITIALIZE()
