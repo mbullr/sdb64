@@ -1,6 +1,15 @@
 Version 1.0-3
 -------------
-(mab)  Added cooperative scheduler between the VM and python. Description is found in SD GUI Python cooperative scheduling.txt in
+(mab)  Add to Python: 
+        SD_PyGuiStep       Process one bounded Python GUI event step 
+        SD_PyPoll          Return the next queued Python GUI event 
+        SD_PyGuiWinUpdate  Update PyGui Window's Gui Object value 
+        SD_PyGuiWinUpdateS Update multi PyGui Window's Gui Object values
+        SD_PyListCrte      Create list object 
+        SD_PyListAppdS     Append dyn array list to list object 
+        SD_PyListClr       Modify how list is cleared
+        
+        Added cooperative scheduler between the VM and python. Description is found in SD GUI Python cooperative scheduling.txt in
          Documentation folder.
          Allows both Python GUI (Tkinter) and BASIC program to both remain response with Gui window open.  This is very BETA!!!
          See SD_TK_DEMO.BP program in sd64/examples/python/embedded_python/BP.

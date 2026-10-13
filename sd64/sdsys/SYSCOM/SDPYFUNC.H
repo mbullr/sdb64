@@ -1,4 +1,4 @@
-* SDPYFUNC.H
+*  SDPYFUNC.H
 * SD Python Functions  
 * Copyright (c)2026 The SD Developers, All Rights Reserved
 *
@@ -17,7 +17,7 @@
 * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 *
 * START-HISTORY:
-* rev 0.9-2 Apr 25 mab 
+* rev 1.0-3  Added PY_LISTCRTE, PY_LISTAPPDS, PY_PYPOLL, PY_PYGUISTEP, PY_GUIWINUPDATE(s)
 * END-HISTORY
 *
 * START-DESCRIPTION:
@@ -45,9 +45,11 @@ deffun PY_DICTGETVALUES(dictname) calling '!PY_DICTGETVALUES'
 deffun PY_STRSET(strname,value) calling '!PY_STRSET'
 deffun PY_STRGET(strname) calling '!PY_STRGET'
 *
+deffun PY_LISTCRTE(listname) calling '!PY_LISTCRTE'
 deffun PY_LISTAPPD(listname,objname) calling '!PY_LISTAPPD'
 deffun PY_LISTGETS(listname) calling '!PY_LISTGETS'
 deffun PY_LISTCLR(listname) calling '!PY_LISTCLR'
+deffun PY_LISTAPPDS(listname,dynlist) calling '!PY_LISTAPPDS'
 *
 deffun PY_PYGUISTEP() calling '!PY_PYGUISTEP'
 deffun PY_PYPOLL() calling '!PY_PYPOLL'

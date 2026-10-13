@@ -418,7 +418,12 @@ static int sd_py_poll(void)
   return 0;
 }
 
-/* FreeSimpleGui window update function
+/* FreeSimpleGui window update function               */
+/* update single key / values in freesimplegui window */
+/* key_name window key name                           */
+/* new_text value to set                              */
+/*   window.update[key_name] = new_text               */
+/* 
  creates the window object for window named "window_title", looks up Key_name in `AllKeysDict`, gets the element, changes its value to new_text, and then calls `update()` on that element.
 Sample call:
 PyObject *mod = PyImport_ImportModule("FreeSimpleGUI");
@@ -507,7 +512,11 @@ static int sd_py_update_key_value_in_window(PyObject *module, const char *window
 
     return 0;
 }
-
+/*                                                  */
+/* update mult key / values in freesimplegui window */
+/* key_list vm marked list of keys                  */
+/* value_list vm marked list of values              */
+/*                                                  */
 static int sd_py_update_multi_key_value_in_window(PyObject *module, const char *window_title,
                               const char *key_list, const char *value_list)
 {
@@ -631,6 +640,56 @@ static int sd_py_update_multi_key_value_in_window(PyObject *module, const char *
 
     return 0;
 }
+/* routine to add vm string list (dyn array in sd terms)   */
+/* to python list object                                   */
+/* list - python list object      */
+/* value_list - vm list of values */
+static int sd_py_add_multi_value_to_list(PyObject *list, const char *value_list)
+{
+    char* vm_value;
+    int value_count;
+    int valIdx;
+    int myResult;
+    
+    char* myVM = "\xFD";
+
+    // value count
+    value_count = Dcount(value_list, myVM);
+    
+    if (value_count == 0){
+        fprintf(stderr, "String List Contains No Items\n");
+        return SD_PyErr_NoItems;
+    }
+    // now loop thru the value list and append to list object
+    for (valIdx = 0; valIdx < value_count; valIdx++) { 
+        /* rem Extract allocates our buffer space must be freed when complete */
+        /* rem we are a @vm list                                              */
+
+        vm_value = Extract(value_list, 1,valIdx+1, 0);
+       
+        PyObject *pvalue = PyUnicode_FromString(vm_value);
+        if (pvalue == NULL) {
+            free(vm_value);
+            return SD_PyErr_CreStr;
+        }
+    
+        myResult = PyList_Append(list,pvalue);
+        if (myResult != 0){
+          // failed to append
+          free(vm_value);
+          Py_DECREF(pvalue);
+          PyErr_Print();
+          return SD_PyErr_LstAppdEr;
+        }
+        
+        free(vm_value);
+        Py_DECREF(pvalue);
+        
+    }        
+    return 0;
+}
+
+/* shut down python */
 
 int sdext_py_finalize(void){
       if (Py_IsInitialized()) {  /* only finalize if previously initialized */
@@ -640,7 +699,11 @@ int sdext_py_finalize(void){
         return SD_PyEr_NotInit; 
       }
 }
-
+/*                                                                                    */
+/* All important function that calls the function that implements the python function */
+/* key - python function to call , defined in keys.h    */
+/* Arg   Arg2  Arg3   vary depending on called function */
+/* somewhat defined in SYSCOM/SDPYFUNC.H                */
 void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
 
   FILE *pyfd;         /* file descriptor for python script file */
@@ -873,7 +936,9 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
 }
 
 /***************************************************************************************************************************/
-/*  Python Objects Extension             
+/*  Python Objects Extension  
+* Functions defined here are actually called from op_sdpyobj() the function that implements Basic function SD_PYOBJ    
+* result = SD_PYOBJ(ARG3,ARG2,ARG1,py_funcition id)   where function ids are defined in keys.h    
 * 
 * Some Notes:
 * From Python Documentation https://docs.python.org/3/c-api/index.html
@@ -922,7 +987,7 @@ int PyDictCrte(char* dictname ){
 
   } else {
     // exists, this is an error
-    myResult = SD_PyErr_DictExsts; 
+    myResult = SD_PyErr_ObjExsts; 
     Py_XDECREF(dict_lookup);
 
   }
@@ -1314,6 +1379,54 @@ int PyStrGet(char* strname ){
 }
 
 /***************************************************************************************************************************/
+/* Create List                                                                                                            */
+/* rem, value ends up in SD descriptor so we really only return a status code                                              */
+/***************************************************************************************************************************/
+
+int PyListCrte(char* listname ){
+  /* create List object */  
+  int myResult;
+  PyObject* dict_lookup;
+
+  myResult = 0;
+  char nullresult[] = "";
+
+  /* does list (or object with this name) exist? */ 
+  dict_lookup = lookup_dict_item(global_dict, listname);
+  if (dict_lookup != NULL) {
+    // already exists!
+    k_put_c_string(nullresult, e_stack);   /* return empty string */
+    Py_XDECREF(dict_lookup);
+    return SD_PyErr_ObjExsts;
+
+  } else {
+    // nothing matches that name, create the list
+    PyObject *list = PyList_New(0);
+    // did we succeed?
+    if (!list) {
+      // nope
+      k_put_c_string(nullresult, e_stack);   /* return empty string */
+      Py_XDECREF(dict_lookup);
+      return SD_PyErr_List; 
+    } else {
+      // created, add it to the main_module name space
+      myResult = PyMapping_SetItemString(global_dict, listname, list);
+      if (myResult != 0){
+        // failed to add to global dictionary namespace !?
+        myResult =  SD_PyErr_NamSpcErr;
+      }
+      // free up ref  (global dict holds a ref to the new list, we should be safe to do this)
+      Py_XDECREF(list);
+    }
+
+    Py_XDECREF(dict_lookup);
+  }
+
+  return myResult;
+}
+
+
+/***************************************************************************************************************************/
 /* Get List                                                                                                            */
 /* rem, value ends up in SD descriptor so we really only return a status code                                              */
 /***************************************************************************************************************************/
@@ -1405,6 +1518,42 @@ int PyListAppd(char* listname, char* objname){
 }
 
 /***************************************************************************************************************************/
+/* List append dyn array                                                                                                          */
+/* Append  sd dyn array items  to list  (vm separated)                                         */
+/***************************************************************************************************************************/
+
+int PyListAppdS(char* listname, char* value_list){
+
+  int myResult;
+  PyObject* list_lookup;
+  myResult = 0;
+
+  /* does listobject (or object with this name) already exist? */ 
+  list_lookup = lookup_dict_item(global_dict, listname);
+  if (list_lookup == NULL) {
+  /* does not exist, report error */
+    return SD_PyErr_ObjNOF;
+  }
+ 
+  //  is it a list object?
+  if (PyList_Check(list_lookup)){
+    // yes, its a list, append vm list to list
+    myResult = sd_py_add_multi_value_to_list(list_lookup,value_list);
+    if (myResult != 0){
+      // failed to append
+      PyErr_Print();
+      myResult =  SD_PyErr_LstAppdEr;
+    }
+  } else {
+    // not a list
+    myResult = SD_PyErr_NotList; 
+  }
+
+  Py_XDECREF(list_lookup);
+  return myResult;
+}
+
+/***************************************************************************************************************************/
 /* List Clear                                                                                                              */
 /* Deletes objects in list                                                                                                 */
 /***************************************************************************************************************************/
@@ -1425,7 +1574,10 @@ int PyListClr(char* listname){
     // exists, is it a list object?
     if (PyList_Check(list_lookup)){
       // yes, its a list, clear the  object
-      PySequence_DelSlice(list_lookup, 0, PySequence_Length(list_lookup));
+          //PySequence_DelSlice(list_lookup, 0, PySequence_Length(list_lookup));
+      // This mimics `del list[:]` by replacing the entire slice with NULL
+      myResult = PyList_SetSlice(list_lookup, 0, PY_SSIZE_T_MAX, NULL);
+
       if (myResult != 0){
         // failed to clear
         PyErr_Print();

@@ -257,6 +257,44 @@ rtn_string = PY_LISTAPPD("alist","my_str")
 rtn_stat = PY_RUNSTRING("print(alist)")
 crt
 
+crt str('=',50)
+crt 'Now re display contents of alist and my_str via PY_RUNSTRING'
+rtn_stat = PY_RUNSTRING("print(alist)")
+crt
+rtn_stat = PY_RUNSTRING("print(my_str)") 
+crt
+crt 'attempt to append my_str to alist items '
+
+rtn_string = PY_LISTAPPD("alist","my_str")
+rtn_stat = PY_RUNSTRING("print(alist)")
+crt
+crt str('=',50)
+crt 'clear alist'
+rtn_stat = PY_LISTCLR("alist")
+*
+crt 'Now re display contents of alist and my_str via PY_RUNSTRING'
+rtn_stat = PY_RUNSTRING("print(alist)")
+crt
+*
+crt str('=',50)
+crt 'create blist'
+rtn_stat = PY_LISTCRTE('blist')
+crt 'Now re display contents of blist and my_str via PY_RUNSTRING'
+rtn_stat = PY_RUNSTRING("print(blist)")
+crt
+
+crt str('=',50)
+crt 'append vm list blist to python list object blist'
+blist = "item 1" :@VM: "item 2":@VM: "item 3":@VM: "item 4"
+for i = 1 to dcount(blist,@vm)
+  crt 'blist<1,':i:'> = ':blist<1,i>
+next i
+crt
+rtn_stat = PY_LISTAPPDS('blist',blist)
+crt 'Now re display contents of blist and my_str via PY_RUNSTRING'
+rtn_stat = PY_RUNSTRING("print(blist)")
+crt
+
 *
 * don't finalize, we will check when sd closes
 999: crt 'complete'

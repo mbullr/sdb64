@@ -55,8 +55,10 @@ extern int PyDictValuesS(char* dictname);
 extern int PyStrSet(char* strname, char* strvalue );
 extern int PyStrGet(char* strname );
 
+extern int PyListCrte(char* listname );
 extern int PyListGet(char* listname );
 extern int PyListAppd(char* listname, char* objname);
+extern int PyListAppdS(char* listname, char* vm_list);
 extern int PyListClr(char* listname);
 
 extern int PyObjLen(char* objname);
@@ -70,6 +72,11 @@ Private char* freeArg(char* Arg);
 
 /* ======================================================================
    op_sdpyobj()   op code for BASIC function SD_PYOBJ   
+   calling format result = SD_PYOBJ(ARG3,ARG2,ARG1,py_funcition id) 
+   where function ids are defined in keys.h 
+   Note: the intent is to not allow the user to call SD_PYOBJ directly but use the
+     functions calls define in SYSCOM/SDPYFUNC.H
+     Also notice how the ARG positions are switch via SDPYFUNC.H and the refernced GPL.BP module
  
       Stack:
         +=============================++=============================+
@@ -231,6 +238,15 @@ void op_sdpyobj() {
 
     /********************* list objects **********************/  
 
+    case SD_PyListCrte:
+      /* create empty list     */
+      /* Arg1 is the name of the list object */
+      myResult = PyListCrte(Arg1);    
+      process.status = myResult;
+      InitDescr(e_stack, INTEGER);
+      (e_stack++)->data.value = (int32_t)myResult;
+      break;
+
     case SD_PyListGet:
       /* get list items as fld mrk separated string list   */
       // Arg1 is name of List object
@@ -252,6 +268,17 @@ void op_sdpyobj() {
       InitDescr(e_stack, INTEGER);
       (e_stack++)->data.value = (int32_t)myResult;
       break;  
+
+    case SD_PyListAppdS:
+      /* Append dyn list (vm separated) object to list */
+      // Arg1 is name of list object
+      // Arg2 is name of dyn list append
+
+      myResult = PyListAppdS(Arg1, Arg2);    
+      process.status = myResult;
+      InitDescr(e_stack, INTEGER);
+      (e_stack++)->data.value = (int32_t)myResult;
+      break; 
 
     case SD_PyListClr:
       /* Clear list */

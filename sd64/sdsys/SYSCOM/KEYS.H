@@ -3,7 +3,7 @@
       * Copyright (c) 2004, Ladybridge Systems, All Rights Reserved
       
       $list off
-      * rev 1.0-3 Add Python Gui defines for sdext function calls
+      * rev 1.0-3 Add Python Gui and additonal List function keys for sdext function calls
       * rev 0.9-2 Mar 25 mab add sdpyobj
       * rev 0.9.0 Jan 25 mab with the change in ownership of group ACCOUNTS
       *                      add SYSTEM() keys
@@ -309,10 +309,11 @@
       $define SD_PyObjLen      2216  ;* get object length (return err overflow > 32bits)
       $define SD_PyObjType     2217  ;* get object type
       
+      $define SD_PyListCrte    2220  ;* create list object 
       $define SD_PyListGet     2221  ;* get list items as tab separated string 
       $define SD_PyListAppd    2222  ;* append object to list   
-      $define SD_PyListClr     2223  ;* clear list object     
-      
+      $define SD_PyListClr     2223  ;* clear list object
+      $define SD_PyListAppdS   2224  ;* append dyn array list to list object
        
       
       * SYSTEM() keys for BASIC Function SYSTEM() as defined in gplsrc/op_sys.c
