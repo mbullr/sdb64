@@ -702,7 +702,7 @@ static int sd_py_update_window_values_list(PyObject* module, const char *window_
     }
 
     // 1. Look up the  element: window[key]
-    PyObject* pKey = PyUnicode_FromString("key_name");
+    PyObject* pKey = PyUnicode_FromString(key_name);
     if (pKey == NULL) {
       Py_DECREF(pDict);
       Py_DECREF(pWindow);
@@ -978,7 +978,7 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
       (e_stack++)->data.value = (int32_t)myResult;
       break;
 
-      case SD_PyGuiWinUpdValues:
+    case SD_PyGuiWinUpdValues:
       if (Py_IsInitialized()){
         // FreeSimpleGUI must have been imported in script as sg 
         PyObject *mod = PyImport_ImportModule(PyGuiModule);

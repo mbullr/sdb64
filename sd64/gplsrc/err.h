@@ -350,5 +350,4 @@
 #define SD_PyErr_GuiWinNOF   -12048  /* Window not found (from object name) */ 
 #define SD_PyErr_CallMethod  -12049  /* calling objects method failed */ 
 #define SD_PyErr_KeyValCnt   -12050  /* key list and value list count mismatch */ 
-#define SD_PyErr_GuiWinLst   -12051  /* Expecting Window and List object */
 /* END-CODE */

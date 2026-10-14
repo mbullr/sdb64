@@ -261,11 +261,19 @@ void op_sdext() {
           sdext_py(SD_PyGuiWinUpdate, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2]);
         }
       break;
-        case SD_PyGuiWinUpdateS:
+    case SD_PyGuiWinUpdateS:
         if (argCnt != 3){
           sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 2 args for this to work */
         }else{
           sdext_py(SD_PyGuiWinUpdateS, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2]);
+        }
+      break;
+
+    case SD_PyGuiWinUpdValues:
+        if (argCnt != 3){
+          sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 2 args for this to work */
+        }else{
+          sdext_py(SD_PyGuiWinUpdValues, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2]);
         }
       break;
     #endif  
