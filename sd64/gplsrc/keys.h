@@ -371,8 +371,9 @@
 #define  SD_PyGetAtt      2100  /* Return the (string) value of python attribute defined in qmBasic variable VAL   */
 #define  SD_PyGuiStep     2020  /* Process one bounded Python GUI event step */
 #define  SD_PyPoll        2021  /* Return the next queued Python GUI event */
-#define  SD_PyGuiWinUpdate  2030  /* update PyGui Window's Gui Object value */
-#define  SD_PyGuiWinUpdateS 2031  /* update multi PyGui Window's Gui Object values */
+#define  SD_PyGuiWinUpdate    2030  /* update PyGui Window's Gui Object's value */
+#define  SD_PyGuiWinUpdateS   2031  /* update multi PyGui Window's Gui Objects' value */
+#define  SD_PyGuiWinUpdValues 2032  /* update PyGui Window's Gui Object's values */
 
 #define  SD_PyDictCrte    2200  /* Creaete new dictionary for sd */
 #define  SD_PyDictClr     2201  /* Clear  dictionary Keys and Values, (Name remains in global dictionary) for sd */

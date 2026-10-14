@@ -134,11 +134,10 @@ static SD_EVENT *sd_event_dequeue(void);
 static void sd_event_drain_wakeup(void);
 static int sd_py_gui_step(void);
 static int sd_py_poll(void);
-static int sd_py_update_key_value_in_window(PyObject *module, const char *window_title,
-                              const char *key_name, const char *new_text);
+static int sd_py_update_key_value_in_window(PyObject *module, const char *window_name, const char *key_name, const char *new_text);
+static int sd_py_update_multi_key_value_in_window(PyObject *module, const char *window_name, const char *key_list, const char *value_list);
+static int sd_py_update_window_values_list(PyObject* module, const char *window_name, const char *key_name, const char *listname); 
 
-static int sd_py_update_multi_key_value_in_window(PyObject *module, const char *window_title,
-                              const char *key_list, const char *value_list);
 
 int sd_python_event_fd(void)
 {
@@ -424,7 +423,7 @@ static int sd_py_poll(void)
 /* new_text value to set                              */
 /*   window.update[key_name] = new_text               */
 /* 
- creates the window object for window named "window_title", looks up Key_name in `AllKeysDict`, gets the element, changes its value to new_text, and then calls `update()` on that element.
+ creates the window object for window named "window_name", looks up Key_name in `AllKeysDict`, gets the element, changes its value to new_text, and then calls `update()` on that element.
 Sample call:
 PyObject *mod = PyImport_ImportModule("FreeSimpleGUI");
 if (mod != NULL) {
@@ -435,7 +434,7 @@ if (mod != NULL) {
     return SD_PyErr_NoFreeGui;
 }
 */    
-static int sd_py_update_key_value_in_window(PyObject *module, const char *window_title,
+static int sd_py_update_key_value_in_window(PyObject *module, const char *window_name,
                               const char *key_name, const char *new_text)
 {
     PyObject *pMainModule = PyImport_ImportModule("__main__");
@@ -444,10 +443,10 @@ static int sd_py_update_key_value_in_window(PyObject *module, const char *window
         return SD_PyErr_MainScope;
     }
 
-    PyObject *pWindow = PyObject_GetAttrString(pMainModule,window_title);
+    PyObject *pWindow = PyObject_GetAttrString(pMainModule,window_name);
     Py_DECREF(pMainModule);
     if (pWindow == NULL) {
-        fprintf(stderr, "Window %s is not found\n",window_title);
+        fprintf(stderr, "Window %s is not found\n",window_name);
         PyErr_Print();
         return SD_PyErr_GuiWinNOF;
     }
@@ -517,7 +516,7 @@ static int sd_py_update_key_value_in_window(PyObject *module, const char *window
 /* key_list vm marked list of keys                  */
 /* value_list vm marked list of values              */
 /*                                                  */
-static int sd_py_update_multi_key_value_in_window(PyObject *module, const char *window_title,
+static int sd_py_update_multi_key_value_in_window(PyObject *module, const char *window_name,
                               const char *key_list, const char *value_list)
 {
     char* key_name;
@@ -534,10 +533,10 @@ static int sd_py_update_multi_key_value_in_window(PyObject *module, const char *
         return SD_PyErr_MainScope;
     }
 
-    PyObject *pWindow = PyObject_GetAttrString(pMainModule,window_title);
+    PyObject *pWindow = PyObject_GetAttrString(pMainModule,window_name);
     Py_DECREF(pMainModule);
     if (pWindow == NULL) {
-        fprintf(stderr, "Window %s is not found\n",window_title);
+        fprintf(stderr, "Window %s is not found\n",window_name);
         PyErr_Print();
         return SD_PyErr_GuiWinNOF;
     }
@@ -640,6 +639,127 @@ static int sd_py_update_multi_key_value_in_window(PyObject *module, const char *
 
     return 0;
 }
+
+/* FreeSimpleGui window update function               */
+/* update values for freesimplegui window object      */
+/* module - FreeSimpleGui module object               */
+/* window_name - window object name                   */
+/* name of widget in window (key) to update           */
+/* listname - name of Existing python List to update widget with     */
+
+static int sd_py_update_window_values_list(PyObject* module, const char *window_name, const char *key_name, const char *listname) 
+{
+    char nullresult[] = "";
+
+    PyObject *pMainModule = PyImport_ImportModule("__main__");
+    if (pMainModule == NULL) {
+        PyErr_Print();
+        return SD_PyErr_MainScope;
+    }
+
+    PyObject *pWindow = PyObject_GetAttrString(pMainModule,window_name);
+    Py_DECREF(pMainModule);
+    if (pWindow == NULL) {
+        fprintf(stderr, "Window %s is not found\n",window_name);
+        PyErr_Print();
+        return SD_PyErr_GuiWinNOF;
+    }
+
+    // Extract 'AllKeysDict' from the Window object
+    PyObject *pDict = PyObject_GetAttrString(pWindow, "AllKeysDict");
+    if (pDict == NULL) {
+        Py_DECREF(pWindow);
+        fprintf(stderr, "GetAttrString: AllKeysDict not found\n");
+        PyErr_Print();
+        return SD_PyErr_ObjAttrNOF;
+    }
+
+    if (!PyDict_Check(pDict)) {
+        fprintf(stderr, "AllKeysDict is not a dictionary\n");
+        Py_DECREF(pDict);
+        Py_DECREF(pWindow);
+        return SD_PyErr_NotDict;
+    }
+
+
+    /* does list (or object with this name) exist? */ 
+    PyObject *pExistingList = lookup_dict_item(global_dict, listname);
+    if (pExistingList == NULL) {
+      // does not exist!
+      k_put_c_string(nullresult, e_stack);   /* return empty string */
+      Py_DECREF(pDict);
+      Py_DECREF(pWindow);
+      return SD_PyErr_ObjNOF;
+    } 
+
+    // Safety check: ensure the passed object is actually a Python list
+    if (!PyList_Check(pExistingList)) {
+        fprintf(stderr, "Expected a valid list object.");
+        Py_DECREF(pDict);
+        Py_DECREF(pWindow);
+        Py_DECREF(pExistingList);
+        return SD_PyErr_NotList;
+    }
+
+    // 1. Look up the  element: window[key]
+    PyObject* pKey = PyUnicode_FromString("key_name");
+    if (pKey == NULL) {
+      Py_DECREF(pDict);
+      Py_DECREF(pWindow);
+      Py_DECREF(pExistingList);
+      return SD_PyErr_CreStr;
+    }
+    
+    PyObject* pElement = PyObject_GetItem(pWindow, pKey);
+    Py_DECREF(pKey); 
+
+    if (pElement == NULL) {
+        // PyErr_Format(PyExc_KeyError, "Key not found in AllKeysDict: %s", key_name);
+      fprintf(stderr,"Key not found in AllKeysDict: %s\n", key_name);
+      PyErr_Print();
+      Py_DECREF(pDict);
+      Py_DECREF(pWindow);
+      Py_DECREF(pExistingList);
+      return SD_PyEr_Key;
+    }
+
+    // 2. Create the kwargs dictionary for .update(values=...)
+    PyObject* pKwargs = PyDict_New();
+    
+    // NOTE: PyDict_SetItemString INCREMENTS the reference count of pExistingList.
+    PyDict_SetItemString(pKwargs, "values", pExistingList);
+
+    // 3. Fetch the element's 'update' method
+    PyObject* pUpdateMethod = PyObject_GetAttrString(pElement, "update");
+    if (pUpdateMethod && PyCallable_Check(pUpdateMethod)) {
+        
+        // Positional args must be an empty tuple because we are using kwargs
+        PyObject* pEmptyArgs = PyTuple_New(0);
+        
+        // 4. Execute: .update(values=pExistingList)
+        PyObject* pResult = PyObject_Call(pUpdateMethod, pEmptyArgs, pKwargs);
+        
+        // Clean up call variables
+        Py_DECREF(pEmptyArgs);
+        if (pResult) {
+            Py_DECREF(pResult); 
+        } else {
+            PyErr_Print(); // Handles Python traceback if .update() failed internally
+        }
+    } else {
+        PyErr_Print();
+    }
+
+    // 5. Final cleanup of locally created objects
+    Py_DECREF(pDict);
+    Py_DECREF(pWindow);
+    Py_DECREF(pExistingList);
+    Py_XDECREF(pUpdateMethod);
+    Py_DECREF(pKwargs);        // Note !! This safely decrements the reference to pExistingList inside it
+    Py_DECREF(pElement);
+    return 0;
+}
+
 /* routine to add vm string list (dyn array in sd terms)   */
 /* to python list object                                   */
 /* list - python list object      */
@@ -857,6 +977,28 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
       InitDescr(e_stack, INTEGER);
       (e_stack++)->data.value = (int32_t)myResult;
       break;
+
+      case SD_PyGuiWinUpdValues:
+      if (Py_IsInitialized()){
+        // FreeSimpleGUI must have been imported in script as sg 
+        PyObject *mod = PyImport_ImportModule(PyGuiModule);
+        if (mod != NULL) {
+          // Arg: "My Window", Arg2: "my_key", Arg3: "list object name"
+          //sd_py_update_window_values_list(PyObject* module, const char *window_name, const char *key_name, const char *listname)
+          myResult = sd_py_update_window_values_list(mod, Arg, Arg2, Arg3);
+          Py_DECREF(mod);
+        } else {
+          fprintf(stderr, "%s Module not found, is 'Import %s as sg' in your script?:\n",PyGuiModule,PyGuiModule);
+          PyErr_Print();
+          myResult = SD_PyErr_NoFreeGui;
+        }
+      } else {
+        myResult = SD_PyEr_NotInit;
+      }
+      process.status = myResult;
+      InitDescr(e_stack, INTEGER);
+      (e_stack++)->data.value = (int32_t)myResult;
+      break;  
 
     case SD_PyRunStr:   /* Take the string in Arg passed from op_sdme_ext (from SDME.EXT Arg value) and run in python interpreter  */
                          
