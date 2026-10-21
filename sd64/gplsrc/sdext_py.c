@@ -137,7 +137,8 @@ static int sd_py_poll(void);
 static int sd_py_update_key_value_in_window(PyObject *module, const char *window_name, const char *key_name, const char *new_text);
 static int sd_py_update_multi_key_value_in_window(PyObject *module, const char *window_name, const char *key_list, const char *value_list);
 static int sd_py_update_window_values_list(PyObject* module, const char *window_name, const char *key_name, const char *listname); 
-
+static int sd_py_table_set(const char *list_name, const char *dyn_list);
+void sd_py_table_get(const char *list_name, const char *dyn_list);
 
 int sd_python_event_fd(void)
 {
@@ -762,7 +763,7 @@ static int sd_py_update_window_values_list(PyObject* module, const char *window_
 
 /* routine to add vm string list (dyn array in sd terms)   */
 /* to python list object                                   */
-/* list - python list object      */
+/* list - python list object !! assumes caller has validated !!! */
 /* value_list - vm list of values */
 static int sd_py_add_multi_value_to_list(PyObject *list, const char *value_list)
 {
@@ -809,6 +810,133 @@ static int sd_py_add_multi_value_to_list(PyObject *list, const char *value_list)
     return 0;
 }
 
+// FreeSimpleGui table list build function                                 //
+// take the dynamic array in dyn_list and populate                         //
+// Existing list list_name with it                                         //
+// in such a manner as it will work to populate FreeSimpleGUI Table widget //
+static int sd_py_table_set(const char *list_name, const char *dyn_list)
+{
+// rem converting dyn array to list of lists:
+// if a row (or cell) has set to an empty space ("")
+// dyn_list:
+// col1 <svm>   col2  <svm>   col3 <vm>   <--- row 1
+// col1 <svm>   col2  <svm>   col3 <vm>   <--- row 2
+// col1 <svm>   col2  <svm>   col3        <--- row 3
+//
+// to table list of lists
+// [ [col1 ,    col2  ,   col3]   <--- row 1
+//   [col1 ,    col2  ,   col3]   <--- row 2
+//   [col1 ,    col2  ,   col3] ] <--- row 3
+
+  int myResult;
+  PyObject* ptable_list;
+
+  int rowct;
+  int colct;
+  int rowidx;
+  int colidx;
+  char *rowdata;
+  char *colcell;
+
+  char* myVM = "\xFD";
+  char* mySVM = "\xFC";
+
+  //test if pylist_name is a list object (and defined in our gobal dic???)
+  /* get a list of List objects items */  
+
+  myResult = 0;
+
+  /* does list (or object with this name) exist? */ 
+  ptable_list = lookup_dict_item(global_dict, list_name);
+  if (ptable_list == NULL) {
+    return SD_PyErr_ObjNOF;
+  } else {
+    
+    // exists, is it a list object?
+    if (!PyList_Check(ptable_list)){
+      // object was not a list object, report error
+      Py_XDECREF(ptable_list);
+      return SD_PyErr_NotList;
+    }
+
+    Py_XDECREF(ptable_list);   // safe to do here, still has ref in global dict
+  }
+    
+  rowct = Dcount(dyn_list, myVM);
+
+  // now loop thru the rows and append cols to list object
+  for (rowidx = 0; rowidx < rowct; rowidx++) {
+
+    rowdata = Extract(dyn_list, 1,rowidx+1, 0);
+    colct = Dcount(rowdata, mySVM);
+
+      // create "row" list
+      PyObject *plist = PyList_New(0);
+      if (!plist) {
+        free(rowdata);
+        return SD_PyErr_List;
+      }
+
+      // now extrax each row's col values and append cols values to list object
+      for (colidx = 0; colidx < colct; colidx++) { 
+        colcell = Extract(rowdata, 1, 1, colidx+1);
+
+        // create python string from cell data 
+        PyObject *pvalue = PyUnicode_FromString(colcell);
+        if (pvalue == NULL) {
+          free(rowdata);
+          free(colcell);
+          Py_DECREF(plist);
+          PyErr_Print();
+          return SD_PyErr_CreStr;
+        }
+        
+        myResult = PyList_Append(plist,pvalue);
+        if (myResult != 0){
+        // failed to append
+          free(rowdata);
+          free(colcell);
+          Py_DECREF(pvalue);
+          Py_DECREF(plist);
+          PyErr_Print();
+          return SD_PyErr_LstAppdEr;
+        }
+        
+        // we have added the cell data to our list, free it and it's python string 
+        // and get next col cell for this row
+        free(colcell);
+        Py_DECREF(pvalue);  // rem successful append inc pvalue ref count so get ride of 1
+      }
+      
+      //  if we ended up with and list of col values (the row data was not empty)
+      //   append to pylist_name
+      if (PyList_Size(plist) > 0){
+        myResult = PyList_Append(ptable_list,plist);
+        if (myResult != 0){
+        // failed to append
+          free(rowdata);
+          Py_DECREF(plist);   
+          PyErr_Print();
+          return SD_PyErr_LstAppdEr;
+        }  
+      }
+      Py_DECREF(plist);   // done with the list created for the current row's values
+
+    //  and process next row
+    
+  }
+return 0;  
+}
+
+void sd_py_table_get(const char *list_name, const char *dyn_list){
+// get list_name's values from the FreeSimpleGUI table list and populate the dyn array dyn_list wit the data 
+// rem sd_py_table_get:
+// populates the sd data object pointed to by e_stack with k_put_c_string(c string, e_stack)  
+// inc the stack pointer e_stack++
+// sets process.status 
+return;  
+}
+
 /* shut down python */
 
 int sdext_py_finalize(void){
@@ -819,6 +947,7 @@ int sdext_py_finalize(void){
         return SD_PyEr_NotInit; 
       }
 }
+
 /*                                                                                    */
 /* All important function that calls the function that implements the python function */
 /* key - python function to call , defined in keys.h    */
@@ -999,6 +1128,39 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
       InitDescr(e_stack, INTEGER);
       (e_stack++)->data.value = (int32_t)myResult;
       break;  
+
+
+    case SD_PyGuiTableSet:
+      /* populate existing list with table data from dyn array */
+      if (Py_IsInitialized()){
+        // FreeSimpleGUI must have been imported in script as sg 
+
+        // Arg: table list name, Arg2: dyn list for table data
+        myResult = sd_py_table_set(Arg, Arg2);
+
+      } else {
+        myResult = SD_PyEr_NotInit;
+      }
+      process.status = myResult;
+      InitDescr(e_stack, INTEGER);
+      (e_stack++)->data.value = (int32_t)myResult;
+      break;  
+
+    case SD_PyGuiTableGet:   
+      /* get (read) Gui table list data in dyn array */
+      
+      if (!Py_IsInitialized()) {
+      /* we dont have a running python interpreter */
+        process.status = SD_PyEr_NotInit;
+        k_put_c_string(nullresult, e_stack);   /* sets descr as type string and place empty string value into it */
+        e_stack++;
+      } else {
+      sd_py_table_get(Arg, Arg2);           
+      // rem sd_py_table_get:
+      // populates the sd data object pointed to by e_stack with k_put_c_string(c string, e_stack)  
+      // inc the stack pointer e_stack++
+      // sets process.status
+      }
 
     case SD_PyRunStr:   /* Take the string in Arg passed from op_sdme_ext (from SDME.EXT Arg value) and run in python interpreter  */
                          
@@ -1962,10 +2124,12 @@ void obj_to_str(PyObject* pval){
         
       /* bytes object hopefully we encoded using latin, otherwise we will have issues with @FM @VM @SVM */
       pyResult = PyBytes_AsString(pval);   /* get the c string */
+      // REM The returned pointer points directly to the internal buffer of the PyBytesObject managed by the Python runtime.
+      // SO DO NOT FREE IT, decref of pval will handle it
       k_put_c_string(pyResult, e_stack);   /* sets descr as type string and place the python value into it */
       
     }else{
-        
+      fprintf(stderr,"not bytes\n");
       /* not a byte object */
       /* for now all non byte objects are converted to string then encoded as Latin, more work to be done here  */
       psval =  PyObject_Str(pval);              /* convert result object to string representation */
@@ -1991,6 +2155,8 @@ void obj_to_str(PyObject* pval){
       }
 
       pyResult = PyBytes_AsString(pbval);  /* finally get the c string */
+      fprintf(stderr,"Result: %s\n",pyResult);
+      
       k_put_c_string(pyResult, e_stack);   /* sets descr as type string and place the python value into it */
       Py_XDECREF(psval);
       Py_XDECREF(pbval);

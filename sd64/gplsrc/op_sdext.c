@@ -256,14 +256,14 @@ void op_sdext() {
       break;
     case SD_PyGuiWinUpdate:
         if (argCnt != 3){
-          sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 2 args for this to work */
+          sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 3 args for this to work */
         }else{
           sdext_py(SD_PyGuiWinUpdate, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2]);
         }
       break;
     case SD_PyGuiWinUpdateS:
         if (argCnt != 3){
-          sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 2 args for this to work */
+          sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 3 args for this to work */
         }else{
           sdext_py(SD_PyGuiWinUpdateS, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2]);
         }
@@ -271,11 +271,27 @@ void op_sdext() {
 
     case SD_PyGuiWinUpdValues:
         if (argCnt != 3){
-          sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 2 args for this to work */
+          sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 3 args for this to work */
         }else{
           sdext_py(SD_PyGuiWinUpdValues, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2]);
         }
       break;
+
+    case SD_PyGuiTableSet:
+        if (argCnt != 2){
+          sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 2 args for this to work */
+        }else{
+          sdext_py(SD_PyGuiTableSet, SDMEArgArray[0], SDMEArgArray[1],NULL);
+        }
+      break;  
+
+    case SD_PyGuiTableGet:
+        if (argCnt != 2){
+          sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 2 args for this to work */
+        }else{
+          sdext_py(SD_PyGuiTableGet, SDMEArgArray[0], SDMEArgArray[1],NULL);
+        }
+      break;    
     #endif  
 
 
