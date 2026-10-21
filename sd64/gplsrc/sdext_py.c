@@ -87,11 +87,17 @@ int PyObjType(char* objname);
 
 int PyDelObj(char* objname);
 
-PyObject* List_To_String(PyObject* list);
+PyObject* List_To_String(PyObject* list, int sep_char);
+// define my dyn array string field separators
+#define fm_sep 1
+#define vm_sep 2
+#define svm_sep 3
+
 
 PyObject* lookup_dict_item(PyObject* dict, const char* key);
 
 void obj_to_str(PyObject* pval);
+
 
 
 /* python objects for embedded python, these need to hang around between calls! */
@@ -934,6 +940,21 @@ void sd_py_table_get(const char *list_name, const char *dyn_list){
 // populates the sd data object pointed to by e_stack with k_put_c_string(c string, e_stack)  
 // inc the stack pointer e_stack++
 // sets process.status 
+// psudo code:
+// create empty python string object pystring_data
+// access the existing table list
+//
+// for each row in table
+//   convert row data (its list) to a string array with List_To_String
+//   append this python string to pystring_data
+//
+// convert pystring_data to a c string using obj_to_str()
+//
+// rem: List_To_String(PyObject* list, int sep_char) function already exists to create python string from list object with
+// items separated by specified field mark character
+// and  obj_to_str(python_string_object) which will convert the string to a c string and place in sd variable
+//
+
 return;  
 }
 
@@ -1525,7 +1546,7 @@ int PyDictKeysS(char* dictname){
       // yes it is a dictionary.
       // get a pyobject list of keys
       keys_list = PyDict_Keys(dict_lookup);
-      keys_str  = List_To_String(keys_list);
+      keys_str  = List_To_String(keys_list,fm_sep);
       obj_to_str(keys_str);
       Py_XDECREF(keys_list);
       if (process.status != 0){
@@ -1573,7 +1594,7 @@ int PyDictValuesS(char* dictname){
       // yes it is a dictionary.
       // get a pyobject list of values
       values_list = PyDict_Values(dict_lookup);
-      values_str  = List_To_String(values_list);
+      values_str  = List_To_String(values_list,fm_sep);
       obj_to_str(values_str);
       Py_XDECREF(values_list);
       if (process.status != 0){
@@ -1754,7 +1775,7 @@ int PyListGet(char* listname ){
     // exists, is it a list object?
     if (PyList_Check(dict_lookup)){
         // yes, access list items and convert to string
-        PyObject* list_str  = List_To_String(dict_lookup);
+        PyObject* list_str  = List_To_String(dict_lookup,fm_sep);
         obj_to_str(list_str);
         if (process.status != 0){
           myResult = process.status;    // pass error number back (set by List_To_String)
@@ -2011,31 +2032,56 @@ int PyDelObj(char* objname){
 }
 
 /***************************************************************************************************************************/
-/*  convert python list object to string  object with @fm separator                                                            */
+/*  convert python list object to python string  object with defined separator                                                            */
 /***************************************************************************************************************************/
-PyObject* List_To_String(PyObject* list){
+PyObject* List_To_String(PyObject* list, int sep_char){
+// rem:
+//#define fm_sep 1
+//#define vm_sep 2
+//#define svm_sep 3
+
 // returns string object, caller is responsible to dec ref when finished with it!
 //
     int first_pass;
     first_pass = 1;
-
+// check for valid seperator 
+    if (sep_char < fm_sep || sep_char > svm_sep){    
+        process.status = SD_PyErr_NoItems;
+        return NULL;
+    }
 // check for elements in list
-
+    
     Py_ssize_t list_size = PyList_Size(list);
     if (list_size == 0) {
         process.status = SD_PyErr_NoItems;
         return NULL;
     }
+
     // create an empty string object to hold our result
-    // and tab string for separator 
+    // and vm string for separator 
+
     PyObject* result_str = PyUnicode_FromString("");
     if (!result_str) {
         process.status = SD_PyErr_CreStr;
         return NULL;
     }
 
-   // PyObject* tab_str = PyUnicode_FromString("\t");
-    PyObject* sep_str = PyUnicode_FromString("þ"); // field marker character latin (small letter thorn is the character "þ")
+    PyObject* sep_str = NULL;
+
+    switch (sep_char){
+      case fm_sep:
+        sep_str = PyUnicode_FromString("þ"); // field marker character latin (small letter thorn is the character "þ")
+        break;
+
+      case vm_sep:
+        sep_str = PyUnicode_FromString("ý"); // value marker character latin (Latin Small Letter Y with Acute)
+        break;
+
+      case svm_sep:
+        sep_str = PyUnicode_FromString("ü"); // sub value marker character latin (latin small letter U with diaeresis)
+        break;
+    }
+   
     if (!sep_str) {
       Py_XDECREF(result_str);
       process.status = SD_PyErr_CreStr;
@@ -2067,6 +2113,7 @@ PyObject* List_To_String(PyObject* list){
           PyObject* temp_sep = PyUnicode_Concat(result_str, sep_str);
 
           if (!temp_sep) {
+            Py_XDECREF(item_str);
             Py_XDECREF(sep_str);
             Py_XDECREF(result_str);
             process.status = SD_PyErr_ConCat;
@@ -2074,6 +2121,7 @@ PyObject* List_To_String(PyObject* list){
           }
           // release the prior version of result_str and point to new concatinated string object
           Py_XDECREF(result_str);
+          // copy the pointer 
           result_str = temp_sep;
 
         } 
@@ -2089,8 +2137,8 @@ PyObject* List_To_String(PyObject* list){
             return NULL;
         }
 
-        result_str = temp_str; /* not sure about this result string is a python object pointer created above
-		                            we Py_XDECREF(result_str) before assignment, so the created object "should" be free
+        result_str = temp_str; /* Rem does not change the reference count. It just copies the pointer. 
+                                We Py_XDECREF(result_str) before assignment, so the created object "should" be free
 									              we then point result_str to temp_str, which is returned to caller on loop completion.
 									              (caller's responsibility to dec) */
     }
