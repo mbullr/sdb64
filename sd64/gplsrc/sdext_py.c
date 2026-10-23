@@ -88,11 +88,15 @@ int PyObjType(char* objname);
 int PyDelObj(char* objname);
 
 PyObject* List_To_String(PyObject* list, int sep_char);
-// define my dyn array string field separators
-#define fm_sep 1
-#define vm_sep 2
-#define svm_sep 3
-
+// define my dyn array string field separators in unicode for python use
+#define fm_sep 0
+#define vm_sep 1
+#define svm_sep 2
+const char* unicode_sd_sep[] = {
+        "\u00fe", // thorn (þ) fm
+        "\u00fd", // y with acute (ý) vm
+        "\u00fc"  // u with diaeresis (ü) svm
+    };
 
 PyObject* lookup_dict_item(PyObject* dict, const char* key);
 
@@ -144,7 +148,7 @@ static int sd_py_update_key_value_in_window(PyObject *module, const char *window
 static int sd_py_update_multi_key_value_in_window(PyObject *module, const char *window_name, const char *key_list, const char *value_list);
 static int sd_py_update_window_values_list(PyObject* module, const char *window_name, const char *key_name, const char *listname); 
 static int sd_py_table_set(const char *list_name, const char *dyn_list);
-void sd_py_table_get(const char *list_name, const char *dyn_list);
+void sd_py_table_get(const char *list_name);
 
 int sd_python_event_fd(void)
 {
@@ -761,7 +765,7 @@ static int sd_py_update_window_values_list(PyObject* module, const char *window_
     Py_DECREF(pDict);
     Py_DECREF(pWindow);
     Py_DECREF(pExistingList);
-    Py_XDECREF(pUpdateMethod);
+    Py_DECREF(pUpdateMethod);
     Py_DECREF(pKwargs);        // Note !! This safely decrements the reference to pExistingList inside it
     Py_DECREF(pElement);
     return 0;
@@ -861,11 +865,10 @@ static int sd_py_table_set(const char *list_name, const char *dyn_list)
     // exists, is it a list object?
     if (!PyList_Check(ptable_list)){
       // object was not a list object, report error
-      Py_XDECREF(ptable_list);
+      Py_DECREF(ptable_list);
       return SD_PyErr_NotList;
     }
 
-    Py_XDECREF(ptable_list);   // safe to do here, still has ref in global dict
   }
     
   rowct = Dcount(dyn_list, myVM);
@@ -880,6 +883,7 @@ static int sd_py_table_set(const char *list_name, const char *dyn_list)
       PyObject *plist = PyList_New(0);
       if (!plist) {
         free(rowdata);
+        Py_DECREF(ptable_list);
         return SD_PyErr_List;
       }
 
@@ -893,6 +897,7 @@ static int sd_py_table_set(const char *list_name, const char *dyn_list)
           free(rowdata);
           free(colcell);
           Py_DECREF(plist);
+          Py_DECREF(ptable_list);
           PyErr_Print();
           return SD_PyErr_CreStr;
         }
@@ -904,6 +909,7 @@ static int sd_py_table_set(const char *list_name, const char *dyn_list)
           free(colcell);
           Py_DECREF(pvalue);
           Py_DECREF(plist);
+          Py_DECREF(ptable_list);
           PyErr_Print();
           return SD_PyErr_LstAppdEr;
         }
@@ -921,7 +927,8 @@ static int sd_py_table_set(const char *list_name, const char *dyn_list)
         if (myResult != 0){
         // failed to append
           free(rowdata);
-          Py_DECREF(plist);   
+          Py_DECREF(plist); 
+          Py_DECREF(ptable_list);  
           PyErr_Print();
           return SD_PyErr_LstAppdEr;
         }  
@@ -931,11 +938,12 @@ static int sd_py_table_set(const char *list_name, const char *dyn_list)
     //  and process next row
     
   }
+Py_DECREF(ptable_list);  
 return 0;  
 }
 
-void sd_py_table_get(const char *list_name, const char *dyn_list){
-// get list_name's values from the FreeSimpleGUI table list and populate the dyn array dyn_list wit the data 
+void sd_py_table_get(const char *pylist_name){
+// get list_name's values from the FreeSimpleGUI table list and populate the callers (sd's) data object pointed to by e_stack 
 // rem sd_py_table_get:
 // populates the sd data object pointed to by e_stack with k_put_c_string(c string, e_stack)  
 // inc the stack pointer e_stack++
@@ -954,8 +962,133 @@ void sd_py_table_get(const char *list_name, const char *dyn_list){
 // items separated by specified field mark character
 // and  obj_to_str(python_string_object) which will convert the string to a c string and place in sd variable
 //
+  char nullresult[] = "";
+  
+  // rtnNull return a null value in the sd string descriptor pointed to by estack and inc the stack
+  #define rtnNull(){\
+    k_put_c_string(nullresult, e_stack);\
+    e_stack++;\
+  }
+  
+  /* does list (or object with this name) exist? */ 
+  PyObject *ptable_list = lookup_dict_item(global_dict, pylist_name);
+  if (ptable_list == NULL) {
+    rtnNull(); 
+    process.status = SD_PyErr_ObjNOF;  
+    return;
+  } else {
+    
+    // exists, is it a list object?
+    if (!PyList_Check(ptable_list)){
+      // object was not a list object, report error
+      Py_DECREF(ptable_list);
+      rtnNull();
+      process.status = SD_PyErr_NotList;
+      return;
+    }
+   
+  }
+  
+  // check for elements in list
+    
+  Py_ssize_t list_size = PyList_Size(ptable_list);
+  if (list_size <= 0) {
+      rtnNull();
+      Py_DECREF(ptable_list); 
+      process.status = SD_PyErr_NoItems;
+      return;
+  }
+  
+  // create an empty string object to hold our result
+  // and vm string for separator 
 
-return;  
+  PyObject* result_str = PyUnicode_FromString("");
+  if (!result_str) {
+    rtnNull();
+    Py_DECREF(ptable_list); 
+    process.status = SD_PyErr_CreStr;
+    return;
+  }
+  PyObject* sep_str = PyUnicode_FromString(unicode_sd_sep[vm_sep]); // create vm field separator character
+  if (!sep_str) {
+    Py_DECREF(result_str);
+    rtnNull();
+    Py_DECREF(ptable_list);
+    process.status = SD_PyErr_CreStr;
+    return;
+  }
+  
+  // iterate over all the list items
+  int first_pass;
+  first_pass = 1;  
+      
+  for (Py_ssize_t i = 0; i < list_size; ++i) {
+    // get list item i
+    PyObject* pcol_list = PySequence_GetItem(ptable_list, i);
+    if (!pcol_list) {
+      Py_DECREF(sep_str);
+      Py_DECREF(result_str);
+      rtnNull();
+      Py_DECREF(ptable_list);
+      process.status = SD_PyErr_LstItem;
+      return;
+    }
+    // convert the list item (which should be a list of column values) to a string separated by svm
+    
+    PyObject* pcol_str = List_To_String(pcol_list, svm_sep);  // rem sets process.status on error
+    Py_DECREF(pcol_list);  // done with col_list
+    if (!pcol_str) {
+      Py_DECREF(sep_str);
+      Py_DECREF(result_str);
+      rtnNull();
+      Py_DECREF(ptable_list);
+      process.status = SD_PyErr_CreStr;
+      return;
+    }                                           
+
+    if (!first_pass){   // only add separator after first pass
+      // concatenate together, but we need to add in separator first!
+      PyObject* temp_sep = PyUnicode_Concat(result_str, sep_str);
+
+      if (!temp_sep) {
+        Py_DECREF(pcol_str);
+        Py_DECREF(sep_str);
+        Py_DECREF(result_str);
+        rtnNull();
+        Py_DECREF(ptable_list);
+        process.status = SD_PyErr_ConCat;
+        return;
+      }
+      // release the prior version of result_str and point to new concatenated string object
+      Py_DECREF(result_str);
+      // copy the pointer 
+      result_str = temp_sep;
+
+    } 
+      
+    first_pass = 0;
+    PyObject* temp_str = PyUnicode_Concat(result_str, pcol_str);
+    Py_DECREF(result_str);
+    Py_DECREF(pcol_str);
+
+    if (!temp_str) {
+        Py_DECREF(sep_str);
+        rtnNull();
+        Py_DECREF(ptable_list);
+        process.status = SD_PyErr_ConCat;
+        return;
+    }
+
+    result_str = temp_str; /* Rem does not change the reference count. It just copies the pointer. 
+                              We Py_DECREF(result_str) before assignment, so the created object "should" be free
+                              we then point result_str to temp_str, which is returned to caller on loop completion.
+                              (caller's responsibility to dec) */
+  }
+  Py_DECREF(sep_str);
+  /* convet to string, note obj_to_str handles any errors   from PyMapping_GetItemString */
+  obj_to_str(result_str);
+  Py_DECREF(ptable_list);
+  return;
 }
 
 /* shut down python */
@@ -1176,7 +1309,7 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
         k_put_c_string(nullresult, e_stack);   /* sets descr as type string and place empty string value into it */
         e_stack++;
       } else {
-      sd_py_table_get(Arg, Arg2);           
+      sd_py_table_get(Arg);           
       // rem sd_py_table_get:
       // populates the sd data object pointed to by e_stack with k_put_c_string(c string, e_stack)  
       // inc the stack pointer e_stack++
@@ -1192,7 +1325,7 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
           myResult = SD_PyEr_Excpt;
           PyErr_Print();
         } else {
-          Py_XDECREF(prun);
+          Py_DECREF(prun);
         }
       }else{
         myResult = SD_PyEr_NotInit;  
@@ -1219,7 +1352,7 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
             myResult = SD_PyEr_Excpt;
             PyErr_Print();
           } else {
-             Py_XDECREF(prun);
+             Py_DECREF(prun);
           }
           fclose(pyfd);
         }  
@@ -1272,7 +1405,7 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 ){
 *    Reference Counts:
 * A safe approach is to always use the generic operations (functions whose name begins with PyObject_, PyNumber_, PySequence_ or PyMapping_). 
 * These operations always create a new strong reference (i.e. increment the reference count) of the object they return.
-* This leaves the caller with the responsibility to call Py_XDECREF() when they are done with the result; this soon becomes second nature.     
+* This leaves the caller with the responsibility to call Py_DECREF() when they are done with the result; this soon becomes second nature.     
 * So we favor Py_Mapping_ to Py_Dict_ function calls
 */
 /***************************************************************************************************************************/
@@ -1307,13 +1440,13 @@ int PyDictCrte(char* dictname ){
         myResult =  SD_PyErr_NamSpcErr;
       }
       // free up ref  (global dict holds a ref to the new_dict, we should be safe to do this)
-      Py_XDECREF(new_dict);
+      Py_DECREF(new_dict);
     }
 
   } else {
     // exists, this is an error
     myResult = SD_PyErr_ObjExsts; 
-    Py_XDECREF(dict_lookup);
+    Py_DECREF(dict_lookup);
 
   }
 
@@ -1342,11 +1475,11 @@ int PyDictClr(char* dictname ){
     if (PyDict_Check(dict_lookup)) {
       // yes it is a dictionary, clear it's key : values
       PyDict_Clear(dict_lookup);
-      Py_XDECREF(dict_lookup);
+      Py_DECREF(dict_lookup);
       return 0;  
     } else {
       // object was not a dictionary
-      Py_XDECREF(dict_lookup);
+      Py_DECREF(dict_lookup);
       return SD_PyErr_NotDict;
     }
 
@@ -1381,8 +1514,8 @@ int PyDictValSetS(char* dictname, char* key, char* value){
       PyObject *Pyvalue = PyUnicode_DecodeLatin1(value, (Py_ssize_t) strlen(value), "strict");
       if (Pyvalue == NULL){
         PyErr_Print();
-        //Py_XDECREF(Pykey);
-        Py_XDECREF(dict_lookup);
+        //Py_DECREF(Pykey);
+        Py_DECREF(dict_lookup);
         return SD_PyErr_EnLatin;
       }  
 
@@ -1394,15 +1527,15 @@ int PyDictValSetS(char* dictname, char* key, char* value){
         myResult = SD_PyErr_DictSet;
       }
       // Clean up
-      //Py_XDECREF(Pykey);
-      Py_XDECREF(Pyvalue);
+      //Py_DECREF(Pykey);
+      Py_DECREF(Pyvalue);
 
     } else {
       // object was not a dictionary, report error
       myResult = SD_PyErr_NotDict;
     }
 
-    Py_XDECREF(dict_lookup);
+    Py_DECREF(dict_lookup);
   }
 
   return myResult;
@@ -1442,7 +1575,7 @@ int PyDictValGetS(char* dictname, char* key){
 
       if (Pykey == NULL){
           PyErr_Print();
-          Py_XDECREF(dict_lookup);
+          Py_DECREF(dict_lookup);
           k_put_c_string(nullresult, e_stack);   /* return empty string */
           return SD_PyErr_EnLatin;
       }
@@ -1455,7 +1588,7 @@ int PyDictValGetS(char* dictname, char* key){
         k_put_c_string(nullresult, e_stack);   /* return empty string */
         myResult = SD_PyEr_Key;
       } 
-      Py_XDECREF(Pykey);
+      Py_DECREF(Pykey);
 
     } else {
       // object was not a dictionary, report error
@@ -1463,7 +1596,7 @@ int PyDictValGetS(char* dictname, char* key){
       myResult = SD_PyErr_NotDict;
     }
 
-    Py_XDECREF(dict_lookup);
+    Py_DECREF(dict_lookup);
   }
 
   return myResult;
@@ -1494,7 +1627,7 @@ int PyDictDel(char* dictname, char* key){
       PyObject *PyKey = PyUnicode_DecodeLatin1(key, (Py_ssize_t) strlen(key), "strict");
       if (PyKey == NULL){
         PyErr_Print();
-        Py_XDECREF(dict_lookup);
+        Py_DECREF(dict_lookup);
         return SD_PyErr_EnLatin;
       }  
 
@@ -1505,14 +1638,14 @@ int PyDictDel(char* dictname, char* key){
         myResult = SD_PyErr_DictDel;
       }
       // Clean up
-      Py_XDECREF(PyKey);
+      Py_DECREF(PyKey);
 
     } else {
       // object was not a dictionary, report error
       myResult = SD_PyErr_NotDict;
     }
 
-    Py_XDECREF(dict_lookup);
+    Py_DECREF(dict_lookup);
   }
 
   return myResult;
@@ -1548,7 +1681,7 @@ int PyDictKeysS(char* dictname){
       keys_list = PyDict_Keys(dict_lookup);
       keys_str  = List_To_String(keys_list,fm_sep);
       obj_to_str(keys_str);
-      Py_XDECREF(keys_list);
+      Py_DECREF(keys_list);
       if (process.status != 0){
         myResult = process.status;    // pass error number back (set by List_To_String)
       }  
@@ -1559,7 +1692,7 @@ int PyDictKeysS(char* dictname){
       myResult = SD_PyErr_NotDict;
     }
     
-    Py_XDECREF(dict_lookup);
+    Py_DECREF(dict_lookup);
   }
 
   return myResult;
@@ -1596,7 +1729,7 @@ int PyDictValuesS(char* dictname){
       values_list = PyDict_Values(dict_lookup);
       values_str  = List_To_String(values_list,fm_sep);
       obj_to_str(values_str);
-      Py_XDECREF(values_list);
+      Py_DECREF(values_list);
       if (process.status != 0){
         myResult = process.status;    // pass error number back (set by List_To_String)
       }  
@@ -1607,7 +1740,7 @@ int PyDictValuesS(char* dictname){
       myResult = SD_PyErr_NotDict;
     }
     
-    Py_XDECREF(dict_lookup);
+    Py_DECREF(dict_lookup);
   }
 
   return myResult;
@@ -1657,10 +1790,10 @@ int PyStrSet(char* strname, char* strvalue ){
       // not a string
       myResult = SD_PyErr_NotStr; 
     }
-    Py_XDECREF(dict_lookup);
+    Py_DECREF(dict_lookup);
   }
   // free up ref  (global dict holds a ref to the new_string, we should be safe to do this)
-  Py_XDECREF(new_string);
+  Py_DECREF(new_string);
 
   return myResult;
   }
@@ -1697,7 +1830,7 @@ int PyStrGet(char* strname ){
       myResult = SD_PyErr_NotStr;
     }
 
-    Py_XDECREF(dict_lookup);
+    Py_DECREF(dict_lookup);
   }
 
   return myResult;
@@ -1721,7 +1854,7 @@ int PyListCrte(char* listname ){
   if (dict_lookup != NULL) {
     // already exists!
     k_put_c_string(nullresult, e_stack);   /* return empty string */
-    Py_XDECREF(dict_lookup);
+    Py_DECREF(dict_lookup);
     return SD_PyErr_ObjExsts;
 
   } else {
@@ -1731,7 +1864,7 @@ int PyListCrte(char* listname ){
     if (!list) {
       // nope
       k_put_c_string(nullresult, e_stack);   /* return empty string */
-      Py_XDECREF(dict_lookup);
+      Py_DECREF(dict_lookup);
       return SD_PyErr_List; 
     } else {
       // created, add it to the main_module name space
@@ -1741,10 +1874,10 @@ int PyListCrte(char* listname ){
         myResult =  SD_PyErr_NamSpcErr;
       }
       // free up ref  (global dict holds a ref to the new list, we should be safe to do this)
-      Py_XDECREF(list);
+      Py_DECREF(list);
     }
 
-    Py_XDECREF(dict_lookup);
+    Py_DECREF(dict_lookup);
   }
 
   return myResult;
@@ -1786,7 +1919,7 @@ int PyListGet(char* listname ){
       myResult = SD_PyErr_NotList;
     }
 
-    Py_XDECREF(dict_lookup);
+    Py_DECREF(dict_lookup);
   }
 
   return myResult;
@@ -1815,7 +1948,7 @@ int PyListAppd(char* listname, char* objname){
   obj_lookup = lookup_dict_item(global_dict, objname);
   if (obj_lookup == NULL) {
   /* does not exist, report error */
-    Py_XDECREF(list_lookup);
+    Py_DECREF(list_lookup);
     return SD_PyErr_ObjNOF;
   
   } else {
@@ -1834,8 +1967,8 @@ int PyListAppd(char* listname, char* objname){
       myResult = SD_PyErr_NotList; 
     }
 
-    Py_XDECREF(list_lookup);
-    Py_XDECREF(obj_lookup);
+    Py_DECREF(list_lookup);
+    Py_DECREF(obj_lookup);
   }
 
 
@@ -1874,7 +2007,7 @@ int PyListAppdS(char* listname, char* value_list){
     myResult = SD_PyErr_NotList; 
   }
 
-  Py_XDECREF(list_lookup);
+  Py_DECREF(list_lookup);
   return myResult;
 }
 
@@ -1914,7 +2047,7 @@ int PyListClr(char* listname){
       myResult = SD_PyErr_NotList; 
     }
 
-    Py_XDECREF(list_lookup);
+    Py_DECREF(list_lookup);
   }
 
   return myResult;
@@ -1945,7 +2078,7 @@ int PyObjLen(char* objname){
     myResult = (int) obj_lenght;
   } 
  
-  Py_XDECREF(obj_lookup);
+  Py_DECREF(obj_lookup);
   return myResult;
 }
 
@@ -1985,7 +2118,7 @@ int PyObjType(char* objname){
     myResult = SD_Obj_Unkn;
   }
 
-  Py_XDECREF(obj_lookup);
+  Py_DECREF(obj_lookup);
   return myResult;
 }
 
@@ -2011,7 +2144,7 @@ int PyDelObj(char* objname){
     PyObject *PyObj = PyUnicode_DecodeLatin1(objname, (Py_ssize_t) strlen(objname), "strict");
     if (PyObj == NULL){
       PyErr_Print();
-      Py_XDECREF(dict_lookup);
+      Py_DECREF(dict_lookup);
       return SD_PyErr_EnLatin;
     }  
 
@@ -2024,8 +2157,8 @@ int PyDelObj(char* objname){
       myResult = SD_PyErr_DelObj;
     }
     // Clean up
-    Py_XDECREF(PyObj);
-    Py_XDECREF(dict_lookup);
+    Py_DECREF(PyObj);
+    Py_DECREF(dict_lookup);
   }
 
   return myResult;
@@ -2044,15 +2177,17 @@ PyObject* List_To_String(PyObject* list, int sep_char){
 //
     int first_pass;
     first_pass = 1;
+    process.status = 0;
+    
 // check for valid seperator 
     if (sep_char < fm_sep || sep_char > svm_sep){    
-        process.status = SD_PyErr_NoItems;
+        process.status = SD_PyErr_UniSepIdx;
         return NULL;
     }
 // check for elements in list
     
     Py_ssize_t list_size = PyList_Size(list);
-    if (list_size == 0) {
+    if (list_size <= 0) {
         process.status = SD_PyErr_NoItems;
         return NULL;
     }
@@ -2066,24 +2201,9 @@ PyObject* List_To_String(PyObject* list, int sep_char){
         return NULL;
     }
 
-    PyObject* sep_str = NULL;
-
-    switch (sep_char){
-      case fm_sep:
-        sep_str = PyUnicode_FromString("þ"); // field marker character latin (small letter thorn is the character "þ")
-        break;
-
-      case vm_sep:
-        sep_str = PyUnicode_FromString("ý"); // value marker character latin (Latin Small Letter Y with Acute)
-        break;
-
-      case svm_sep:
-        sep_str = PyUnicode_FromString("ü"); // sub value marker character latin (latin small letter U with diaeresis)
-        break;
-    }
-   
-    if (!sep_str) {
-      Py_XDECREF(result_str);
+    PyObject* sep_str = PyUnicode_FromString(unicode_sd_sep[sep_char]); // create field separator character
+     if (!sep_str) {
+      Py_DECREF(result_str);
       process.status = SD_PyErr_CreStr;
       return NULL;    
     }
@@ -2093,17 +2213,17 @@ PyObject* List_To_String(PyObject* list, int sep_char){
 	    // get list item i
         PyObject* item = PySequence_GetItem(list, i);
         if (!item) {
-          Py_XDECREF(sep_str);
-          Py_XDECREF(result_str);
+          Py_DECREF(sep_str);
+          Py_DECREF(result_str);
           process.status = SD_PyErr_LstItem;
           return NULL;
         }
         // create string object from list item 
         PyObject* item_str = PyObject_Str(item);
-        Py_XDECREF(item);
+        Py_DECREF(item);
         if (!item_str) {
-          Py_XDECREF(sep_str);
-          Py_XDECREF(result_str);
+          Py_DECREF(sep_str);
+          Py_DECREF(result_str);
           process.status = SD_PyErr_CreStr;
           return NULL;
         }
@@ -2113,14 +2233,14 @@ PyObject* List_To_String(PyObject* list, int sep_char){
           PyObject* temp_sep = PyUnicode_Concat(result_str, sep_str);
 
           if (!temp_sep) {
-            Py_XDECREF(item_str);
-            Py_XDECREF(sep_str);
-            Py_XDECREF(result_str);
+            Py_DECREF(item_str);
+            Py_DECREF(sep_str);
+            Py_DECREF(result_str);
             process.status = SD_PyErr_ConCat;
             return NULL;
           }
           // release the prior version of result_str and point to new concatinated string object
-          Py_XDECREF(result_str);
+          Py_DECREF(result_str);
           // copy the pointer 
           result_str = temp_sep;
 
@@ -2128,21 +2248,21 @@ PyObject* List_To_String(PyObject* list, int sep_char){
         
         first_pass = 0;
         PyObject* temp_str = PyUnicode_Concat(result_str, item_str);
-        Py_XDECREF(result_str);
-        Py_XDECREF(item_str);
+        Py_DECREF(result_str);
+        Py_DECREF(item_str);
 
         if (!temp_str) {
-            Py_XDECREF(sep_str);
+            Py_DECREF(sep_str);
             process.status = SD_PyErr_ConCat;
             return NULL;
         }
 
         result_str = temp_str; /* Rem does not change the reference count. It just copies the pointer. 
-                                We Py_XDECREF(result_str) before assignment, so the created object "should" be free
+                                We Py_DECREF(result_str) before assignment, so the created object "should" be free
 									              we then point result_str to temp_str, which is returned to caller on loop completion.
 									              (caller's responsibility to dec) */
     }
-    Py_XDECREF(sep_str);
+    Py_DECREF(sep_str);
     return result_str;
 }
 
@@ -2177,7 +2297,6 @@ void obj_to_str(PyObject* pval){
       k_put_c_string(pyResult, e_stack);   /* sets descr as type string and place the python value into it */
       
     }else{
-      fprintf(stderr,"not bytes\n");
       /* not a byte object */
       /* for now all non byte objects are converted to string then encoded as Latin, more work to be done here  */
       psval =  PyObject_Str(pval);              /* convert result object to string representation */
@@ -2186,7 +2305,7 @@ void obj_to_str(PyObject* pval){
                                                 /* error converting python object to string */
         process.status = SD_PyEr_ObToStr;
         k_put_c_string(nullresult, e_stack);    /* sets descr as type string and place the python value into it */
-        Py_XDECREF(pval);
+        Py_DECREF(pval);
         return;      
       }
       
@@ -2197,20 +2316,20 @@ void obj_to_str(PyObject* pval){
                                               /* error encoding unicode python string to to Latin */
         process.status = SD_PyErr_UniToStr;
         k_put_c_string(nullresult, e_stack);   /* sets descr as type string and place the python value into it */
-        Py_XDECREF(pval);
-        Py_XDECREF(psval);
+        Py_DECREF(pval);
+        Py_DECREF(psval);
         return;
       }
 
       pyResult = PyBytes_AsString(pbval);  /* finally get the c string */
-      fprintf(stderr,"Result: %s\n",pyResult);
+      //fprintf(stderr,"Result: %s\n",pyResult);
       
       k_put_c_string(pyResult, e_stack);   /* sets descr as type string and place the python value into it */
-      Py_XDECREF(psval);
-      Py_XDECREF(pbval);
+      Py_DECREF(psval);
+      Py_DECREF(pbval);
     }
 
-    Py_XDECREF(pval);
+    Py_DECREF(pval);
 
   }
 

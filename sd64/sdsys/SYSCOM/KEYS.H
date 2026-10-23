@@ -293,7 +293,7 @@
       $define SD_PyGuiWinUpdateS    2031  ;* update multi PyGui Window's Gui Object values
       $define SD_PyGuiWinUpdValues  2032  ;* update PyGui Window's Gui Object's values 
       $define SD_PyGuiTableSet      2033  ;* populate existing list with table data from dyn array 
-      $define SD_PyGuiTableGet      2034  ;* get (read) Gui table list data in dyn array  
+      $define SD_PyGuiTableGet      2034  ;* get (read) Gui table list data into dyn array  
       $define SD_PyGetAtt      2100  ;* Return the (string) value of python attribute defined in qmBasic variable VAL  
       
       $define SD_PyDictCrte    2200  ;* Creaete new dictionary for sd 

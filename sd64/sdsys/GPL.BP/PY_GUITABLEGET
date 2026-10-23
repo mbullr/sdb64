@@ -1,0 +1,51 @@
+* PY_GUITABLEGET
+* get (read) Gui table list data
+* Copyright (c)2026 The SD Developers, All Rights Reserved
+*
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation; either version 3, or (at your option)
+* any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software Foundation,
+* Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+*
+* START-HISTORY:
+* rev 1.0-3 
+* END-HISTORY
+* START-DESCRIPTION:
+*
+* dyn_array = PY_GUITABLEGET(table_list_name)
+*
+* object_name - object name of window created with  "window = sg.Window(....)
+* dyn_array - dynamic array string
+*              row 1 : col data <svm> col data <svm> col data <vm>
+*              row 2 : col data <svm> col data <svm> col data <vm>
+*                   status() - 0 on success, error code as defined in ERR.H
+*
+* END-DESCRIPTION
+*
+* START-CODE
+
+$internal
+$no.symbols
+$no.xref
+function py_guitableget(table_list_name)
+$catalog !py_guitableget
+
+$include KEYS.H
+$include ERR.H
+
+UpdateArgs = table_list_name
+
+dyn_array = SDEXT(UpdateArgs, @FALSE, SD_PyGuiTableGet)
+*
+return dyn_array
+
+end

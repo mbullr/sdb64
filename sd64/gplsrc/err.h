@@ -317,19 +317,20 @@
 #define SD_PyEr_Key        -12007    /* failed to find key in dictionary */
 #define SD_PyEr_ObToStr    -12008    /* failed to convert python object to string */
 #define SD_PyErr_UniToStr  -12009    /* error encoding unicode python string to to Latin */
+#define SD_PyErr_UniSepIdx -12010    /* invalid unicode sep index   */
 
-#define SD_PyErr_MainMod   -12010    /* cannot import __main__ */
-#define SD_PyErr_GlobDict  -12011    /* could get __main__ dictionary  */
-#define SD_PyErr_ObjExsts  -12012    /* object already exists  */
-#define SD_PyErr_NamSpcErr -12013    /* Failed to add to namespace  */
-#define SD_PyErr_ObjNOF    -12014    /* requested object does not exist  */
-#define SD_PyErr_DictSet   -12015    /* failed to set dictionary key / value */
-#define SD_PyErr_DictDel   -12016    /* failed to Delete dictionary key / value */
-#define SD_PyErr_NotDict   -12017    /* Object not a dictionary  */
-#define SD_PyErr_EnLatin   -12018    /* error encoding latin string to unicode      */
-#define SD_PyErr_NotStr    -12019    /* Object not a String (unicode)  */
-#define SD_PyErr_DelObj    -12020    /* Failed to remove Object from global dictionary */
-#define SD_PyErr_ObjAttrNOF -12021   /* Failed to find attribute name in object */
+#define SD_PyErr_MainMod   -12011    /* cannot import __main__ */
+#define SD_PyErr_GlobDict  -12012    /* could get __main__ dictionary  */
+#define SD_PyErr_ObjExsts  -12013   /* object already exists  */
+#define SD_PyErr_NamSpcErr -12014    /* Failed to add to namespace  */
+#define SD_PyErr_ObjNOF    -12015    /* requested object does not exist  */
+#define SD_PyErr_DictSet   -12016    /* failed to set dictionary key / value */
+#define SD_PyErr_DictDel   -12017    /* failed to Delete dictionary key / value */
+#define SD_PyErr_NotDict   -12018    /* Object not a dictionary  */
+#define SD_PyErr_EnLatin   -12019    /* error encoding latin string to unicode      */
+#define SD_PyErr_NotStr    -12020    /* Object not a String (unicode)  */
+#define SD_PyErr_DelObj    -12021    /* Failed to remove Object from global dictionary */
+#define SD_PyErr_ObjAttrNOF -12022   /* Failed to find attribute name in object */
 
 #define SD_PyErr_NoItems   -12030    /* Python Object or String List contains no items */
 #define SD_PyErr_CreStr    -12031    /* Failed to create Python Object from String   */
