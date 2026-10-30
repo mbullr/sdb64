@@ -22,7 +22,7 @@
  * 08 Aug 2024 mab add embedded python
  * rev 0.9.0 Jan 25 mab add sdext_eguid_set set / restore euid egid of process
  * rev 0.9-2 Mar 25 mab mods for sdext_pyobj
- * rev 1.0-3 use safe_malloc
+ * rev 1.0-3 use safe_malloc, up sdext_py arg count
  * 
  * END-HISTORY
  *
@@ -56,7 +56,7 @@ extern void sdext_eguid_set(int key, char* Arg);
 
 /* 20240808 mab embedding python? */
 #ifdef EMBED_PYTHON
-extern void sdext_py(int key, char* Arg, char* Arg2, char* Arg3 );
+extern void sdext_py(int key, char* Arg, char* Arg2, char* Arg3, char* Arg4, char* Arg5 );
 #endif
 
 char* SDMEArgArray[SD_MAX_ARGS];          /* create an array of pointers, for string arguments (for SDEXT call ) not sure if this is correct */
@@ -162,6 +162,11 @@ void op_sdext() {
                  /* Using pop would not free the sting blocks                  */
                  /* After dismiss() e_stack  points to descr which will receive RTNVAL */
 
+  // start with all Null arg pointers
+  for (argIdx = 0; argIdx < SD_MAX_ARGS; argIdx++) {
+     SDMEArgArray[argIdx] = NULL;
+  } 
+
 /* now extract arguments from the past arg string */
 
   if (myval_len == 0) {
@@ -252,20 +257,20 @@ void op_sdext() {
     case SD_PyGuiStep:
     case SD_PyPoll:
   /* embedding Python functions*/
-      sdext_py(key, SDMEArgArray[0], NULL, NULL);
+      sdext_py(key, SDMEArgArray[0], NULL, NULL,NULL,NULL);
       break;
     case SD_PyGuiWinUpdate:
         if (argCnt != 3){
           sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 3 args for this to work */
         }else{
-          sdext_py(SD_PyGuiWinUpdate, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2]);
+          sdext_py(SD_PyGuiWinUpdate, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2],NULL,NULL);
         }
       break;
     case SD_PyGuiWinUpdateS:
         if (argCnt != 3){
           sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 3 args for this to work */
         }else{
-          sdext_py(SD_PyGuiWinUpdateS, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2]);
+          sdext_py(SD_PyGuiWinUpdateS, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2],NULL,NULL);
         }
       break;
 
@@ -273,7 +278,7 @@ void op_sdext() {
         if (argCnt != 3){
           sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 3 args for this to work */
         }else{
-          sdext_py(SD_PyGuiWinUpdValues, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2]);
+          sdext_py(SD_PyGuiWinUpdValues, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2],NULL,NULL);
         }
       break;
 
@@ -281,7 +286,7 @@ void op_sdext() {
         if (argCnt != 2){
           sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 2 args for this to work */
         }else{
-          sdext_py(SD_PyGuiTableSet, SDMEArgArray[0], SDMEArgArray[1],NULL);
+          sdext_py(SD_PyGuiTableSet, SDMEArgArray[0], SDMEArgArray[1],NULL,NULL,NULL);
         }
       break;  
 
@@ -289,7 +294,7 @@ void op_sdext() {
         if (argCnt != 2){
           sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 2 args for this to work */
         }else{
-          sdext_py(SD_PyGuiTableGet, SDMEArgArray[0], SDMEArgArray[1],NULL);
+          sdext_py(SD_PyGuiTableGet, SDMEArgArray[0], SDMEArgArray[1],NULL,NULL,NULL);
         }
       break;    
     #endif  

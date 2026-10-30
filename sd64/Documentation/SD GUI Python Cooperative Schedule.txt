@@ -4,9 +4,6 @@ I’ve narrowed it to the SD extension layer and the event queue; I’m summariz
 
 Searched for regex `sd_python_event_fd\(|SD_PyPoll|post_event\(|gui_step|sd_python_event_ready\(` (`**/*.{c,h}`), 19 results
 
-Read , lines 780 to 859
-
-Read , lines 220 to 280
 
 ## Cooperative scheduling model
 
@@ -21,7 +18,7 @@ The SD runtime polls I/O through `sdpoll()` in `linuxio.c:791-831`. That functio
 This means the SD VM is the one deciding when to wake up and check whether Python has queued something.
 
 ### 2) Python only runs when SD explicitly calls it
-The embedded Python bridge lives in `sdext_py()` in `sdext_py.c:321-589`. It handles commands like:
+The embedded Python bridge lives in `sdext_py(). It handles commands like:
 
 - `SD_PyInit`
 - `SD_PyRunStr`
@@ -33,7 +30,7 @@ The embedded Python bridge lives in `sdext_py()` in `sdext_py.c:321-589`. It han
 Those are invoked from the SD extension dispatcher in `op_sdext.c:245-264`. There is no background Python loop spinning in parallel.
 
 ### 3) The handoff is event-driven
-Python pushes work into the SD event queue via the `sd` module method `post_event()` in `sdext_py.c:296-353`:
+Python pushes work into the SD event queue via the `sd` module method `post_event()` in `sdext_py.c
 
 - event is queued with a mutex-protected linked list
 - a byte is written into a pipe
@@ -50,7 +47,7 @@ So the flow is roughly:
 - VM passes event back to the BASIC/SD side
 
 ### 4) Why this is cooperative
-The code does not create a separate Python execution thread, and there is no `Py_BEGIN_ALLOW_THREADS` / `PyEval_InitThreads` pattern here. Python is initialized once with `Py_Initialize()` in `sdext_py.c:430-483`, and then all Python API calls happen in the same SD execution context.
+The code does not create a separate Python execution thread, and there is no `Py_BEGIN_ALLOW_THREADS` / `PyEval_InitThreads` pattern here. Python is initialized once with `Py_Initialize()` in `sdext_py.c, and then all Python API calls happen in the same SD execution context.
 
 That means:
 
@@ -82,7 +79,7 @@ Here is the round-trip flow as implemented in this codebase.
 
 ### A. Python wants to notify SD
 1. Python code calls the exported module method `sd.post_event(name, payload)`.
-2. That method is defined in `sdext_py.c:296-353`.
+2. That method is defined in `sdext_py.c.
 3. `sd_post_event()` calls `sd_event_enqueue(name, payload)`.
 4. `sd_event_enqueue()`:
    - allocates an `SD_EVENT`
@@ -106,12 +103,12 @@ The key wakeup is here:
    - `sd_python_event_ready()`
    - `sd_python_event_drain()`
 8. Then the VM continues its normal processing, and when it is ready to consume the Python event it executes:
-   - `SD_PyPoll` via the extension dispatch in `op_sdext.c:245-264`
+   - `SD_PyPoll` via the extension dispatch in `op_sdext.c`
 
 ---
 
 ### C. SD consumes the queued Python event
-9. `SD_PyPoll` dispatches to `sdext_py(key, ...)` in `sdext_py.c:365-420` and ends up in the `case SD_PyPoll:` branch.
+9. `SD_PyPoll` dispatches to `sdext_py(key, ...)` in `sdext_py.c and ends up in the `case SD_PyPoll:` branch.
 10. `sd_py_poll()` does:
    - `sd_event_drain_wakeup()`
    - `sd_event_dequeue()`
@@ -125,12 +122,12 @@ The key wakeup is here:
 ### D. Python execution from SD
 For direct SD-to-Python calls, the path is simpler:
 
-1. SD extension function dispatch hits `SD_PyRunStr`, `SD_PyRunFile`, `SD_PyGetAtt`, etc. in `op_sdext.c:245-264`
+1. SD extension function dispatch hits `SD_PyRunStr`, `SD_PyRunFile`, `SD_PyGetAtt`, etc. in `op_sdext.c`
 2. That calls `sdext_py(...)`
 3. In `sdext_py()`:
-   - `case SD_PyRunStr`: executes `PyRun_String(...)` in `sdext_py.c:529-549`
-   - `case SD_PyRunFile`: executes `PyRun_File(...)` in `sdext_py.c:550-576`
-   - `case SD_PyGetAtt`: reads from `global_dict` using `PyMapping_GetItemString(...)` in `sdext_py.c:577-589`
+   - `case SD_PyRunStr`: executes `PyRun_String(...)` in `sdext_py.c`
+   - `case SD_PyRunFile`: executes `PyRun_File(...)` in `sdext_py.c`
+   - `case SD_PyGetAtt`: reads from `global_dict` using `PyMapping_GetItemString(...)` in `sdext_py.c`
 
 ---
 

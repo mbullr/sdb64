@@ -24,6 +24,7 @@
  * rev 0.9.1 Mar 25 return to single rev track 
  * rev 1.0-3 add safe_malloc and ksafe_malloc
  *           the way python finalize was designed a user could cause a seqfault
+ *           increase sdext_py to 5 args
  *           
  * END-HISTORY
  *
@@ -71,6 +72,7 @@
  * START-CODE
  */
 
+#include "sdext_py.h"
 #include <setjmp.h>
 #include <time.h>
 #include <stdarg.h>
@@ -84,6 +86,7 @@
 #define Public
 #define init(a) = a
 
+
 #include "sd.h"
 #include "revstamp.h"
 #include "header.h"
@@ -95,15 +98,10 @@
 #include "locks.h"
 #include "keys.h"
 
+
 #define BUILD_TARGET "64 Bit"
 
 extern char *x_option; /* -x option */
-
-/* 20240808 mab embedding python? */
-#ifdef EMBED_PYTHON
-extern void sdext_py(int key, char* Arg, char* Arg2, char* Arg3);
-extern int sdext_py_finalize(void);
-#endif
 
 bool bind_sysseg(bool create, char *errmsg);
 void unbind_sysseg(void);

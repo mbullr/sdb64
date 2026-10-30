@@ -272,14 +272,14 @@ crt str('=',50)
 crt 'clear alist'
 rtn_stat = PY_LISTCLR("alist")
 *
-crt 'Now re display contents of alist and my_str via PY_RUNSTRING'
+crt 'Now re display contents of alist via PY_RUNSTRING'
 rtn_stat = PY_RUNSTRING("print(alist)")
 crt
 *
 crt str('=',50)
 crt 'create blist'
 rtn_stat = PY_LISTCRTE('blist')
-crt 'Now re display contents of blist and my_str via PY_RUNSTRING'
+crt 'Now re display contents of blist via PY_RUNSTRING'
 rtn_stat = PY_RUNSTRING("print(blist)")
 crt
 
@@ -291,7 +291,7 @@ for i = 1 to dcount(blist,@vm)
 next i
 crt
 rtn_stat = PY_LISTAPPDS('blist',blist)
-crt 'Now re display contents of blist and my_str via PY_RUNSTRING'
+crt 'Now re display contents of blist  via PY_RUNSTRING'
 rtn_stat = PY_RUNSTRING("print(blist)")
 crt
 
