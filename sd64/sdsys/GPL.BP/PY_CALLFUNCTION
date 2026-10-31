@@ -21,10 +21,11 @@
 * END-HISTORY
 * START-DESCRIPTION:
 *
-* string = PY_CALLFUNCTION(function_name,arg1,arg2,arg3,arg4,arg5,arg6)
+* string = PY_CALLFUNCTION(function_name,result_name,arg1,arg2,arg3,arg4,arg5)
 *
 * function_name - name of python function previously imported into interpreter (found in __main__ scope) 
-* arg1- arg6  - names of python objects previously created in interpreter (found in __main__ scope)
+* name of exiting python object to recieve function results (found in __main__ scope) 
+* arg1- arg5  - names of python objects previously created in interpreter (found in __main__ scope)
 *                   status() - 0 on success, error code as defined in ERR.H
 *
 * END-DESCRIPTION
@@ -34,20 +35,22 @@
 $internal
 $no.symbols
 $no.xref
-function py_callfunction(function_name,arg1,arg2,arg3,arg4,arg5,arg6) VAR.ARGS
+function py_callfunction(function_name,result_name,arg1,arg2,arg3,arg4,arg5) VAR.ARGS
 $catalog !py_callfunction
 
 $include KEYS.H
 $include ERR.H
 
 UpdateArgs = function_name
+UpdateArgs<-1> = result_name
+
 passed.args = arg.count()
-if passed.args > 1 then UpdateArgs<-1> = arg1
-if passed.args > 2 then UpdateArgs<-1> = arg2
-if passed.args > 3 then UpdateArgs<-1> = arg3
-if passed.args > 4 then UpdateArgs<-1> = arg4
-if passed.args > 5 then UpdateArgs<-1> = arg5
-if passed.args > 6 then UpdateArgs<-1> = arg6
+
+if passed.args > 2 then UpdateArgs<-1> = arg1
+if passed.args > 3 then UpdateArgs<-1> = arg2
+if passed.args > 4 then UpdateArgs<-1> = arg3
+if passed.args > 5 then UpdateArgs<-1> = arg4
+if passed.args > 6 then UpdateArgs<-1> = arg5
 
 str_result = SDEXT(UpdateArgs, @TRUE, SD_PyCallFunction)
 *

@@ -32,7 +32,7 @@ deffun PY_FINALIZE() calling '!PY_FINALIZE'
 deffun PY_GETATTR(objname) calling '!PY_GETATTR'
 deffun PY_RUNFILE(py_script_file) calling '!PY_RUNFILE'
 deffun PY_RUNSTRING(py_script) calling '!PY_RUNSTRING'
-deffun PY_CALLFUNCTION(function_name,arg1,arg2,arg3,arg4,arg5,arg6) calling '!PY_CALLFUNCTION' VAR.ARGS
+deffun PY_CALLFUNCTION(function_name,result_name,arg1,arg2,arg3,arg4,arg5) calling '!PY_CALLFUNCTION' VAR.ARGS
 
 deffun PY_OBJTYPE(objname) calling '!PY_OBJTYPE'
 deffun PY_OBJLEN(objname) calling '!PY_OBJLEN'
