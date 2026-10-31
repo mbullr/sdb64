@@ -75,7 +75,7 @@
 char PyGuiModule[PyGuiModuleSz] = "FreeSimpleGUI";
 PyObject *global_dict, *main_module;  /* global PyObjects that must hang around between calls */
 
-/* structures for cooperative scheduler */
+/* structures and functions for cooperative scheduler */
 
 
 static int sd_event_queue_init(void);
@@ -118,11 +118,14 @@ PyMODINIT_FUNC PyInit_sd(void)
 volatile bool python_event_pending = FALSE;
 bool sd_module_registered = FALSE;
 
-/*                                                                                    */
-/* All important function that calls the function that implements the python function */
-/* key - python function to call , defined in keys.h    */
-/* Arg   thru  Arg7   vary depending on called function */
-/* somewhat defined in SYSCOM/SDPYFUNC.H                */
+
+/* **************************************************************************************************************** */
+/*                                                                                                                  */
+/* All important function that calls the function that implements the python function                               */
+/* key - python function to call , defined in keys.h                                                                */
+/* Arg   thru  Arg7   vary depending on called function                                                             */
+/* somewhat defined in SYSCOM/SDPYFUNC.H                                                                            */
+/* **************************************************************************************************************** */
 void sdext_py(int key, char* Arg, char* Arg2, char* Arg3, char* Arg4, char* Arg5, char* Arg6, char* Arg7){
 
   FILE *pyfd;         /* file descriptor for python script file */
@@ -336,14 +339,12 @@ void sdext_py(int key, char* Arg, char* Arg2, char* Arg3, char* Arg4, char* Arg5
       if (Py_IsInitialized()){
         // Arg: "Function Name", Arg2: "Function Arg", Arg3: "Function Arg", Arg4: "Function Arg, Arg5: "Function Arg"
         // static int sd_py_call_function(const char *function_name, const char *Arg1, const char *ArgType1, const char *Arg2, const char *ArgType2,const char *Arg3, const char *ArgType3)
-        myResult = sd_py_call_function(Arg, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7);
+        sd_py_call_function(Arg, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7);
       }else{
-        myResult = SD_PyEr_NotInit;  
+        process.status = SD_PyEr_NotInit;
+        k_put_c_string(nullresult, e_stack);   /* sets descr as type string and place empty string value into it */
+        e_stack++; 
       }  
-
-      process.status = myResult;
-      InitDescr(e_stack, INTEGER);
-      (e_stack++)->data.value = (int32_t)myResult;
       break;
 
     case SD_PyRunStr:   /* Take the string in Arg passed from op_sdme_ext (from SDME.EXT Arg value) and run in python interpreter  */
@@ -434,12 +435,12 @@ int sdext_py_finalize(void){
       }
 }
 
+/* **************************************************************************************************************** */
 /* Function to call python module function                                                                          */
-/* Arg: "Function Name", Arg1: "Function Arg", ArgType1: "Function Arg Type"                                        */
+/* Arg: "Function Name", Arg1-6: Function Arg                                                                       */
 /*                       Arg2: "Function Arg", ArgType2: "Function Arg Type"                                        */
 /*                       Arg3: "Function Arg", ArgType3: "Function Arg Type"                                        */
 /* Function Arg is the string name of the python object already define in the global dir                            */
-/* Function Arg type is the python object type defined in keys.h                                                    */
 /*   SD_Obj_Unkn         0   Unknown python object type                                                             */
 /*   SD_Obj_Str          1   String (Unicode) python object type                                                    */
 /*   SD_Obj_List         2   List python object type                                                                */
@@ -451,13 +452,199 @@ int sdext_py_finalize(void){
 /* Either way the assumption is these is a referece to the function available in __mani__                           */
 /* Routine handles varible arg count by assing first NULL arg segnifies the end of passed arguments AND sets        */
 /*  the number of arguments to pass to the python function, kind of a kludge                                        */
-int sd_py_call_function(const char *function_name, const char *Arg1, const char *ArgType1, const char *Arg2, const char *ArgType2,const char *Arg3, const char *ArgType3){
-return 0;
+/* **************************************************************************************************************** */
+
+void sd_py_call_function(const char *function_name, const char *Arg1, const char *Arg2, const char *Arg3, const char *Arg4,const char *Arg5, const char *Arg6){
+ 
+ // rtnNull return a null value in the sd string descriptor pointed to by estack and inc the stack
+  #define rtnNull(){\
+    k_put_c_string(nullresult, e_stack);\
+    e_stack++;\
+  }
+
+  char nullresult[] = "";
+  int argcnt;
+  PyObject *pArg1, *pArg2, *pArg3, *pArg4, *pArg5, *pArg6, *pValue;
+
+  PyObject *pMainModule = PyImport_ImportModule("__main__");
+  if (pMainModule == NULL) {
+      PyErr_Print();
+      rtnNull(); 
+      process.status = SD_PyErr_MainScope;
+      return;
+  }
+
+  PyObject *pFunction = PyObject_GetAttrString(pMainModule,function_name);
+  Py_DECREF(pMainModule);
+  if (pFunction == NULL) {
+      fprintf(stderr, "Function %s not found\n",function_name);
+      PyErr_Print();
+      rtnNull(); 
+      process.status = SD_PyErr_ObjNOF ;
+      return;
+  }
+
+
+  if (PyCallable_Check(pFunction)) {
+    // figure out number of args
+    // I know this is ugly but it is what I am doing
+    argcnt = 0;   // default to no args
+    if (Arg1 != NULL){
+      argcnt = 1;
+      pArg1 = lookup_dict_item(global_dict, Arg1);
+      if (pArg1 == NULL) {
+      /* obj does not exist, report error */
+        Py_DECREF(pFunction);
+        rtnNull(); 
+        process.status = SD_PyErr_ObjNOF;
+        return;
+       }
+    }
+    if (Arg2 != NULL){
+      argcnt = 2;
+      pArg2 = lookup_dict_item(global_dict, Arg2);
+      if (pArg2 == NULL) {
+      /* obj does not exist, report error */
+        Py_DECREF(pFunction);
+        Py_DECREF(pArg1);
+        rtnNull(); 
+        process.status = SD_PyErr_ObjNOF;
+        return;
+       }
+    }
+    if (Arg3 != NULL){
+      argcnt = 3;
+      pArg3 = lookup_dict_item(global_dict, Arg3);
+      if (pArg3 == NULL) {
+      /* obj does not exist, report error */
+        Py_DECREF(pFunction);
+        Py_DECREF(pArg1);
+        Py_DECREF(pArg2);
+        rtnNull();  
+        process.status = SD_PyErr_ObjNOF;
+        return;
+       }
+    }
+    if (Arg4 != NULL){
+      argcnt = 4;
+      pArg4 = lookup_dict_item(global_dict, Arg4);
+      if (pArg4 == NULL) {
+      /* obj does not exist, report error */
+        Py_DECREF(pFunction);
+        Py_DECREF(pArg1);
+        Py_DECREF(pArg2);
+        Py_DECREF(pArg3);
+        rtnNull(); 
+        process.status = SD_PyErr_ObjNOF;
+        return;
+       }
+    }
+    if (Arg5 != NULL){
+      argcnt = 5;
+      pArg5 = lookup_dict_item(global_dict, Arg5);
+      if (pArg5 == NULL) {
+      /* obj does not exist, report error */
+        Py_DECREF(pFunction);
+        Py_DECREF(pArg1);
+        Py_DECREF(pArg2);
+        Py_DECREF(pArg3);
+        Py_DECREF(pArg4);
+        rtnNull(); 
+        process.status = SD_PyErr_ObjNOF;
+        return;
+       }
+    }
+    
+    if (Arg6 != NULL){
+      argcnt = 6;
+      pArg6 = lookup_dict_item(global_dict, Arg6);
+      if (pArg6 == NULL) {
+      /* obj does not exist, report error */
+        Py_DECREF(pFunction);
+        Py_DECREF(pArg1);
+        Py_DECREF(pArg2);
+        Py_DECREF(pArg3);
+        Py_DECREF(pArg4);
+        Py_DECREF(pArg5);
+        rtnNull(); 
+        process.status = SD_PyErr_ObjNOF;
+        return;
+       }
+    }
+
+    // Execute the Python function
+    // Pass the arguments followed by NULL to signal the end of arguments
+    switch (argcnt){
+        case 0:
+           pValue = PyObject_CallFunctionObjArgs(pFunction, NULL);
+           break;
+        case 1:
+           pValue = PyObject_CallFunctionObjArgs(pFunction, pArg1,NULL);
+           Py_DECREF(pArg1);
+           break;
+        case 2:
+           pValue = PyObject_CallFunctionObjArgs(pFunction, pArg1, pArg2, NULL);
+           Py_DECREF(pArg1);
+           Py_DECREF(pArg2);
+           break;
+        case 3:
+           pValue = PyObject_CallFunctionObjArgs(pFunction, pArg1, pArg2, pArg3, NULL);
+           Py_DECREF(pArg1);
+           Py_DECREF(pArg2);
+           Py_DECREF(pArg3);
+           break;  
+        case 4:
+           pValue = PyObject_CallFunctionObjArgs(pFunction, pArg1, pArg2, pArg3, pArg4, NULL);
+           Py_DECREF(pArg1);
+           Py_DECREF(pArg2);
+           Py_DECREF(pArg3);
+           Py_DECREF(pArg4);
+           break; 
+        case 5:
+           pValue = PyObject_CallFunctionObjArgs(pFunction, pArg1, pArg2, pArg3, pArg4, pArg5, NULL);
+           Py_DECREF(pArg1);
+           Py_DECREF(pArg2);
+           Py_DECREF(pArg3);
+           Py_DECREF(pArg4);
+           Py_DECREF(pArg5);
+           break;
+        case 6:
+           pValue = PyObject_CallFunctionObjArgs(pFunction, pArg1, pArg2, pArg3, pArg4, pArg5, pArg6, NULL);
+           Py_DECREF(pArg1);
+           Py_DECREF(pArg2);
+           Py_DECREF(pArg3);
+           Py_DECREF(pArg4);
+           Py_DECREF(pArg5);
+           Py_DECREF(pArg6);
+           break;   
+    }
+    Py_DECREF(pFunction);
+    
+    if (pValue != NULL) {
+        // we really do not what type of object the function returns, so just return a string representation
+        obj_to_str(pValue);  // NOTE obj_to_str does the ref counting for PValue
+        e_stack++;
+    } else {
+        // Handle Python exceptions during execution
+        PyErr_Print();
+        fprintf(stderr, "Python function call failed\n");
+        rtnNull(); 
+        process.status = SD_PyErr_FuncFail;
+    }
+  } else {
+      fprintf(stderr, "Function %s is not callable\n",function_name);
+      rtnNull(); 
+      process.status = SD_PyErr_FuncFail;
+  }
+
+  return;
 }
 
+
+/* **************************************************************************************************************** */
 /* Functions for cooperative scheduler                                                                              */
 /*  See ../Documentation/SD GUI Python Cooperative Schedule.txt for more information                                */
-
+/* **************************************************************************************************************** */
 int sd_python_event_fd(void)
 {
   return sd_event_queue.read_fd;

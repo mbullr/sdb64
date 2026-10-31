@@ -321,7 +321,7 @@
 
 #define SD_PyErr_MainMod   -12011    /* cannot import __main__ */
 #define SD_PyErr_GlobDict  -12012    /* could get __main__ dictionary  */
-#define SD_PyErr_ObjExsts  -12013   /* object already exists  */
+#define SD_PyErr_ObjExsts  -12013    /* object already exists  */
 #define SD_PyErr_NamSpcErr -12014    /* Failed to add to namespace  */
 #define SD_PyErr_ObjNOF    -12015    /* requested object does not exist  */
 #define SD_PyErr_DictSet   -12016    /* failed to set dictionary key / value */
@@ -351,4 +351,5 @@
 #define SD_PyErr_GuiWinNOF   -12048  /* Window not found (from object name) */ 
 #define SD_PyErr_CallMethod  -12049  /* calling objects method failed */ 
 #define SD_PyErr_KeyValCnt   -12050  /* key list and value list count mismatch */ 
+#define SD_PyErr_FuncFail    -12051  /* Python function call failed  */ 
 /* END-CODE */

@@ -41,6 +41,22 @@ lf = char(10)
  script  = 'FMRK   = chr(254)':lf
  script := 'VMRKM  = chr(253)':lf
  script := 'SVMRK  = chr(252)':lf
+ script := 'def func1(list):':lf
+ script := "  print('func1 here!')":lf
+ script := "  for val in list:":lf
+ script := "    print(val)":lf
+ script := "  rtnstr = 'func1 signing off'":lf
+ script := "  return rtnstr":lf
+ *
+ script := 'def func2(list,adict):':lf
+ script := "  print('func2 here!')":lf
+ script := "  for val in list:":lf
+ script := "    print(val)":lf
+ script := "  for key, val in adict.items():":lf
+ script := '    print(f"Key: {key}, Value: {val}")':lf
+ script := "  rtnstr = 'func2 signing off'":lf
+ script := "  return rtnstr":lf
+ *
  script := 'result = ""':lf
  script := 'alist = ["item 1", "item 2", "item 3", "item 4"]':lf
  script := 'countdown = {"3" : "Three", "2" : "Two", "1" : "One", "0" : "Ignition!"}':lf
@@ -294,7 +310,36 @@ rtn_stat = PY_LISTAPPDS('blist',blist)
 crt 'Now re display contents of blist  via PY_RUNSTRING'
 rtn_stat = PY_RUNSTRING("print(blist)")
 crt
-
+crt str('=',50)
+crt 'function call test'
+rtn_str = PY_CALLFUNCTION('func1','blist')
+crt  'status() = ':status()
+crt  'rtn_str  = ':rtn_str
+crt str('=',50)
+rtn_str = PY_CALLFUNCTION('func2','blist','countdown')
+crt  'status() = ':status()
+crt  'rtn_str  = ':rtn_str
+crt str('=',50)
+crt 'call function with invalid list name'
+rtn_str = PY_CALLFUNCTION('func2','xlist','countdown')
+crt  'status() = ':status()
+crt  'rtn_str  = ':rtn_str
+crt str('=',50)
+crt 'call function with invalid arg count'
+rtn_str = PY_CALLFUNCTION('func1','blist','countdown')
+crt  'status() = ':status()
+crt  'rtn_str  = ':rtn_str
+crt str('=',50)
+crt 'call function with invalid function name (nof)'
+rtn_str = PY_CALLFUNCTION('funcx','blist')
+crt  'status() = ':status()
+crt  'rtn_str  = ':rtn_str
+crt str('=',50)
+crt 'call function with invalid function name - blist'
+rtn_str = PY_CALLFUNCTION('blist','countdown')
+crt  'status() = ':status()
+crt  'rtn_str  = ':rtn_str
+crt str('=',50)
 *
 * don't finalize, we will check when sd closes
 999: crt 'complete'
