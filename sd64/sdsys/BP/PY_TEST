@@ -313,42 +313,42 @@ crt
 crt str('=',50)
 
 crt 'function call test'
-rtn_str = PY_CALLFUNCTION('func1','result','blist')
+rtn_st = PY_CALLFUNCTION('func1','result','blist')
 crt  'status() = ':status()
-crt  'rtn_str  = ':rtn_str
+crt  'rtn_st  = ':rtn_st
 crt 'Now re display contents of result via PY_RUNSTRING'
 rtn_stat = PY_RUNSTRING("print(result)")
 crt str('=',50)
 
-rtn_str = PY_CALLFUNCTION('func2','result','blist','countdown')
+rtn_st = PY_CALLFUNCTION('func2','result','blist','countdown')
 crt  'status() = ':status()
-crt  'rtn_str  = ':rtn_str
+crt  'rtn_st  = ':rtn_st
 crt 'Now re display contents of result via PY_RUNSTRING'
 rtn_stat = PY_RUNSTRING("print(result)")
 crt str('=',50)
 
 crt 'call function with invalid list name'
-rtn_str = PY_CALLFUNCTION('func2','result','xlist','countdown')
+rtn_st = PY_CALLFUNCTION('func2','result','xlist','countdown')
 crt  'status() = ':status()
-crt  'rtn_str  = ':rtn_str
+crt  'rtn_st  = ':rtn_st
 crt str('=',50)
 
 crt 'call function with invalid arg count'
-rtn_str = PY_CALLFUNCTION('func1','result','blist','countdown')
+rtn_st = PY_CALLFUNCTION('func1','result','blist','countdown')
 crt  'status() = ':status()
-crt  'rtn_str  = ':rtn_str
+crt  'rtn_st  = ':rtn_st
 crt str('=',50)
 
 crt 'call function with invalid function name (nof)'
-rtn_str = PY_CALLFUNCTION('funcx','result','blist')
+rtn_st = PY_CALLFUNCTION('funcx','result','blist')
 crt  'status() = ':status()
-crt  'rtn_str  = ':rtn_str
+crt  'rtn_st  = ':rtn_st
 crt str('=',50)
 
 crt 'call function with non callable object name - blist'
-rtn_str = PY_CALLFUNCTION('blist','countdown')
+rtn_st = PY_CALLFUNCTION('blist','countdown')
 crt  'status() = ':status()
-crt  'rtn_str  = ':rtn_str
+crt  'rtn_st  = ':rtn_st
 crt str('=',50)
 *
 * don't finalize, we will check when sd closes

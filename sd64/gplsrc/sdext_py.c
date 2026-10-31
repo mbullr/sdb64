@@ -437,32 +437,31 @@ int sdext_py_finalize(void){
 
 /* **************************************************************************************************************** */
 /* Function to call python module function                                                                          */
-/* Arg: "Function Name", Arg2  "Python object name to recieve function results                                      */
-/*                       Arg3 -5 : "Function Arg"                                                                   */
-/* REM we assume function is local to prior executed script OR imported by the prior execute script                 */
-/* Either way the assumption is these is a referece to the function available in __mani__                           */
-/* Routine handles varible arg count by assing first NULL arg segnifies the end of passed arguments AND sets        */
+/* Arg: "Function Name", result_name  "Python object name to recieve function results                               */
+/*                       Arg1 -5 : "Function Arg"                                                                   */
+/* REM we assume function is local to script OR imported by the prior execute script                                */
+/* Either way the assumption is these are names of objects  available in __main__                                   */
+/* Routine handles varible arg count by assuming first NULL arg segnifies the end of passed arguments AND sets      */
 /*  the number of arguments to pass to the python function, kind of a kludge                                        */
 /* **************************************************************************************************************** */
 
-void sd_py_call_function(const char *function_name, const char *result_name, const char *Arg1, const char *Arg2, const char *Arg3,const char *Arg4, const char *Arg5){
+int sd_py_call_function(const char *function_name, const char *result_name, const char *Arg1, const char *Arg2, const char *Arg3,const char *Arg4, const char *Arg5){
  
  // rtnNull return a null value in the sd string descriptor pointed to by estack and inc the stack
-  #define rtnNull(){\
-    k_put_c_string(nullresult, e_stack);\
-    e_stack++;\
+  #define return_status(stat){\
+    process.status = stat;\
+    InitDescr(e_stack, INTEGER);\
+    (e_stack++)->data.value = (int32_t)process.status;\
   }
 
-  char nullresult[] = "";
   int argcnt;
   PyObject *pArg1, *pArg2, *pArg3, *pArg4, *pArg5, *pResult_Name, *pResult_Value;
 
   PyObject *pMainModule = PyImport_ImportModule("__main__");
   if (pMainModule == NULL) {
       PyErr_Print();
-      rtnNull(); 
-      process.status = SD_PyErr_MainScope;
-      return;
+      return_status(SD_PyErr_MainScope);
+      return SD_PyErr_MainScope ;
   }
 
   PyObject *pFunction = PyObject_GetAttrString(pMainModule,function_name);
@@ -470,9 +469,9 @@ void sd_py_call_function(const char *function_name, const char *result_name, con
   if (pFunction == NULL) {
       fprintf(stderr, "Function %s not found\n\r",function_name);
       PyErr_Print();
-      rtnNull(); 
-      process.status = SD_PyErr_ObjNOF ;
-      return;
+      return_status(SD_PyErr_ObjNOF);
+      return SD_PyErr_ObjNOF ;
+      
   }
 
 
@@ -483,9 +482,8 @@ void sd_py_call_function(const char *function_name, const char *result_name, con
       if (pResult_Name == NULL) {
       /* obj dpResultoes not exist, report error */
         Py_DECREF(pFunction);
-        rtnNull(); 
-        process.status = SD_PyErr_ObjNOF;
-        return;
+        return_status(SD_PyErr_ObjNOF);
+        return SD_PyErr_ObjNOF ;
        }
     }
 
@@ -499,9 +497,8 @@ void sd_py_call_function(const char *function_name, const char *result_name, con
       /* obj does not exist, report error */
         Py_DECREF(pFunction);
         Py_DECREF(pResult_Name);
-        rtnNull(); 
-        process.status = SD_PyErr_ObjNOF;
-        return;
+        return_status(SD_PyErr_ObjNOF);
+        return SD_PyErr_ObjNOF ;
        }
     }
     if (Arg2 != NULL){
@@ -512,9 +509,8 @@ void sd_py_call_function(const char *function_name, const char *result_name, con
         Py_DECREF(pFunction);
         Py_DECREF(pResult_Name);
         Py_DECREF(pArg1);
-        rtnNull(); 
-        process.status = SD_PyErr_ObjNOF;
-        return;
+        return_status(SD_PyErr_ObjNOF);
+        return SD_PyErr_ObjNOF ;
        }
     }
     if (Arg3 != NULL){
@@ -526,9 +522,8 @@ void sd_py_call_function(const char *function_name, const char *result_name, con
         Py_DECREF(pResult_Name);
         Py_DECREF(pArg1);
         Py_DECREF(pArg2);
-        rtnNull();  
-        process.status = SD_PyErr_ObjNOF;
-        return;
+        return_status(SD_PyErr_ObjNOF);
+        return SD_PyErr_ObjNOF ;
        }
     }
     if (Arg4 != NULL){
@@ -541,9 +536,8 @@ void sd_py_call_function(const char *function_name, const char *result_name, con
         Py_DECREF(pArg1);
         Py_DECREF(pArg2);
         Py_DECREF(pArg3);
-        rtnNull(); 
-        process.status = SD_PyErr_ObjNOF;
-        return;
+        return_status(SD_PyErr_ObjNOF);
+        return SD_PyErr_ObjNOF ;
        }
     }
     if (Arg5 != NULL){
@@ -557,9 +551,8 @@ void sd_py_call_function(const char *function_name, const char *result_name, con
         Py_DECREF(pArg2);
         Py_DECREF(pArg3);
         Py_DECREF(pArg4);
-        rtnNull(); 
-        process.status = SD_PyErr_ObjNOF;
-        return;
+        return_status(SD_PyErr_ObjNOF);
+        return SD_PyErr_ObjNOF ;
        }
     }
     
@@ -607,33 +600,31 @@ void sd_py_call_function(const char *function_name, const char *result_name, con
       // replace exiting object with results of function call
       int result = PyDict_SetItemString(global_dict, result_name, pResult_Value);
       if (result < 0){
-        process.status = SD_PyErr_DictSet;
         PyErr_Print();
         fprintf(stderr, "Failed to update %s \n\r",result_name);
+        return_status(SD_PyErr_DictSet);
       } else {
-      process.status = 0;
+        return_status(0);
       }
 
       Py_DECREF(pResult_Value);
-      rtnNull();
+
 
     } else {
         // Handle Python exceptions during execution
         PyErr_Print();
         fprintf(stderr, "Python function call failed\n\r");
-        rtnNull(); 
-        process.status = SD_PyErr_FuncFail;
+        return_status(SD_PyErr_FuncFail);
     }
     
     Py_DECREF(pResult_Name);
 
   } else {
       fprintf(stderr, "Function %s is not callable\n\r",function_name);
-      rtnNull(); 
-      process.status = SD_PyErr_FuncFail;
+      return_status(SD_PyErr_FuncFail);
   }
 
-  return;
+  return process.status;
 }
 
 

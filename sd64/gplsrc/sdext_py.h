@@ -8,7 +8,7 @@
 /* sdext_py.c         */
 void sdext_py(int key, char* Arg, char* Arg2, char* Arg3, char* Arg4, char* Arg5, char* Arg6, char* Arg7);
 int sdext_py_finalize(void);
-void sd_py_call_function(const char *function_name, const char *result_name, const char *Arg1, const char *Arg2, const char *Arg3, const char *Arg4,const char *Arg5);
+int sd_py_call_function(const char *function_name, const char *result_name, const char *Arg1, const char *Arg2, const char *Arg3, const char *Arg4,const char *Arg5);
 
 /* sdext_py_schdlr.c   */
 #define SD_EVENT_NAME_SIZE 64

@@ -21,13 +21,13 @@
 * END-HISTORY
 * START-DESCRIPTION:
 *
-* string = PY_CALLFUNCTION(function_name,result_name,arg1,arg2,arg3,arg4,arg5)
+* rtn_stat = PY_CALLFUNCTION(function_name,result_name,arg1,arg2,arg3,arg4,arg5)
 *
 * function_name - name of python function previously imported into interpreter (found in __main__ scope) 
-* name of exiting python object to recieve function results (found in __main__ scope) 
+* name of exiting python object to receive function results (found in __main__ scope) 
 * arg1- arg5  - names of python objects previously created in interpreter (found in __main__ scope)
 *                   status() - 0 on success, error code as defined in ERR.H
-*
+*                   rtn_stat - same
 * END-DESCRIPTION
 *
 * START-CODE
@@ -52,8 +52,8 @@ if passed.args > 4 then UpdateArgs<-1> = arg3
 if passed.args > 5 then UpdateArgs<-1> = arg4
 if passed.args > 6 then UpdateArgs<-1> = arg5
 
-str_result = SDEXT(UpdateArgs, @TRUE, SD_PyCallFunction)
+stat_result = SDEXT(UpdateArgs, @TRUE, SD_PyCallFunction)
 *
-return str_result
+return stat_result
 
 end
