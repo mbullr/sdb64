@@ -294,7 +294,7 @@ void op_sdext() {
       break;  
       
     case SD_PyCallFunction:
-      sdext_py(SD_PyCallFunction, SDMEArgArray[0], SDMEArgArray[1],SDMEArgArray[2],SDMEArgArray[3],SDMEArgArray[5],SDMEArgArray[6],SDMEArgArray[7]);
+      sdext_py(SD_PyCallFunction, SDMEArgArray[0], SDMEArgArray[1],SDMEArgArray[2],SDMEArgArray[3],SDMEArgArray[4],SDMEArgArray[5],SDMEArgArray[6]);
       break;    
 
    #endif  

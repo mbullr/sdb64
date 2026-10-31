@@ -1,0 +1,92 @@
+* PY_POPUP
+* Display popup window
+* Copyright (c)2026 The SD Developers, All Rights Reserved
+*
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation; either version 3, or (at your option)
+* any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software Foundation,
+* Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+*
+* START-HISTORY:
+* rev 1.0-3 
+* END-HISTORY
+* START-DESCRIPTION:
+*
+* rtn_stat = PY_POPUP(function_name, popup_name, title_name, title_text, message_name, message_txt, style_name, style_setting)
+*
+* function_name - name of python function which creates the window 
+* title_name, message_name - name of exiting python object to receive associated text, then used to populate popup
+* title_text, message_text - text to display in popup
+* style_name style_setting  - future use
+*                   status() - 0 on success, error code as defined in ERR.H
+*                   rtn_stat - same
+* END-DESCRIPTION
+*
+* START-CODE
+
+$internal
+$no.symbols
+$no.xref
+$include SDPYFUNC.H
+
+function py_popup(function_name, popup_name, title_name, title_text, message_name, message_text, style_name, style_setting)
+$catalog !py_popup
+
+$include KEYS.H
+$include ERR.H
+
+*
+* first set the text objects
+*
+
+rtn_stat = PY_STRSET(title_name,title_text)
+if rtn_stat <> 0 then
+  return rtn_stat
+end
+
+rtn_stat = PY_STRSET(message_name,message_text)
+if rtn_stat <> 0 then
+  return rtn_stat
+end
+
+begin case
+  case style_setting = PY_PUP_OK
+    style_text = "PY_PUP_OK"
+    
+  case style_setting = PY_PUP_YESNO 
+    style_text = "PY_PUP_YESNO"
+    
+  case style_setting = PY_PUP_OKCANCEL 
+    style_text = "PY_PUP_OKCANCEL"
+    
+  case 1
+    style_text = "PY_PUP_YESNO"
+    
+end case  
+
+rtn_stat = PY_STRSET(style_name,style_text)
+if rtn_stat <> 0 then
+  return rtn_stat
+end
+
+UpdateArgs = function_name
+UpdateArgs<-1> = popup_name
+UpdateArgs<-1> = title_name
+UpdateArgs<-1> = message_name
+UpdateArgs<-1> = style_name
+
+rtn_stat = SDEXT(UpdateArgs, @TRUE, SD_PyCallFunction)
+
+*
+return rtn_stat
+
+end
