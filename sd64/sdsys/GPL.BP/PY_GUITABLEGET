@@ -23,7 +23,7 @@
 *
 * dyn_array = PY_GUITABLEGET(table_list_name)
 *
-* object_name - object name of window created with  "window = sg.Window(....)
+* table_list_name - object name of existing python list
 * dyn_array - dynamic array string
 *              row 1 : col data <svm> col data <svm> col data <vm>
 *              row 2 : col data <svm> col data <svm> col data <vm>

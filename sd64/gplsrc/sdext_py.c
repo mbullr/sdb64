@@ -118,6 +118,12 @@ PyMODINIT_FUNC PyInit_sd(void)
 volatile bool python_event_pending = FALSE;
 bool sd_module_registered = FALSE;
 
+// return_status return a null value in the sd string descriptor pointed to by estack and inc the stack
+ #define return_status(stat){\
+   process.status = stat;\
+   InitDescr(e_stack, INTEGER);\
+   (e_stack++)->data.value = (int32_t)process.status;\
+ }
 
 /* **************************************************************************************************************** */
 /*                                                                                                                  */
@@ -126,302 +132,364 @@ bool sd_module_registered = FALSE;
 /* Arg   thru  Arg7   vary depending on called function                                                             */
 /* somewhat defined in SYSCOM/SDPYFUNC.H                                                                            */
 /* **************************************************************************************************************** */
-void sdext_py(int key, char* Arg, char* Arg2, char* Arg3, char* Arg4, char* Arg5, char* Arg6, char* Arg7){
+int sdext_SD_PyInit(){
+  int myResult;
+  myResult = 0;
+  
+  if (!Py_IsInitialized()) {  /* only initialize if not already so */
+    myResult = sd_event_queue_init();
+    if (myResult != 0){
+      return_status(myResult);
+      return myResult;
+    }
 
+    if (!sd_module_registered) {
+      if (PyImport_AppendInittab("sd", &PyInit_sd) == -1) {
+        myResult = SD_PyErr_MainMod;
+        return_status(myResult);
+        return myResult;
+      }
+      sd_module_registered = TRUE;
+    }
+
+    Py_Initialize();          /* There is no return value; it is a fatal error if the initialization fails. */
+   /* "dictionaries that serve as namespaces for running code are generally required 
+    to have a __builtins__ link to the built-in scope searched last for name lookups"
+    from Programming Python 4th edition, Basic Embedding Techniques,
+    Running Strings in Dictionaries       */
+    if (Py_IsInitialized()) {     /* did initialization succeed? */
+      // 1. Get the main module rem Borrowed reference
+      main_module = PyImport_AddModule("__main__");  
+      if (main_module == NULL) {
+        PyErr_Print();
+        myResult = SD_PyErr_MainMod;  /* could get main module bad news! */
+      }else{
+      // 2. Get the main (global) dictionary rem Borrowed reference
+        global_dict = PyModule_GetDict(main_module);
+        if (global_dict == NULL) {
+          PyErr_Print();
+          myResult = SD_PyErr_GlobDict;  /* could get __main__ dictionary bad news! */
+        }
+
+        if (myResult == 0) {
+          PyObject *sd_module = PyImport_ImportModule("sd");
+          if (sd_module == NULL) {
+            PyErr_Print();
+            myResult = SD_PyErr_MainMod;
+          } else {
+            Py_DECREF(sd_module);
+          }
+        }
+
+      }
+
+
+    }else{
+      myResult =  SD_PyEr_NotInit; /* initialization failed */
+    }
+ 
+  } 
+  return_status(myResult);
+  return myResult;
+}
+
+
+/* finalize python interpreter */
+/* only do this if we are truely done for this sd session */
+int sdext_SD_PyFinal(){
+  int myResult;
+  myResult = 0;
+  /* rem  global_dict, main_module are Borrowed Reference, no decref reqd  */
+  myResult = sdext_py_finalize();
+      
+  return_status(myResult);
+  return myResult;
+}
+
+/* Is python interpreter initialized?   */
+int sdext_SD_IsPyInit(){ 
+  int myResult;
+  myResult = 0;
+  myResult = Py_IsInitialized();
+
+  return_status(myResult);
+  return myResult;
+}
+
+/* Take the string in Arg passed from op_sdme_ext (from SDME.EXT Arg value) and run in python interpreter  */
+int sdext_SD_PyRunStr(const char* Arg){
+  int myResult;
+  myResult = 0;
+  if (Py_IsInitialized()) {
+    PyObject *prun = PyRun_String(Arg, Py_file_input, global_dict, global_dict);    /* run statements */
+    if (prun == NULL){
+    /* exception */
+      myResult = SD_PyEr_Excpt;
+      PyErr_Print();
+    } else {
+      Py_DECREF(prun);
+    }
+  }else{
+    myResult = SD_PyEr_NotInit;  
+  }  
+  
+  return_status(myResult);
+  return myResult;
+} 
+
+
+/* Take the string in Arg passed from op_sdme_ext (from SDME.EXT Arg value) and treat as a file to run in python interpreter   */
+/* must move to pyFilePath[PATH_MAX]   */
+int sdext_SD_PyRunFile(const char* Arg){
+  int myResult;
+  myResult = 0;
   FILE *pyfd;         /* file descriptor for python script file */
   char *pyscriptname; /* script name from pyfd */
   char pyFilePath[PATH_MAX+1] = "";   /* max length a file path can be, defined in linux/limits.h */
   
-  int myResult;
+  snprintf(pyFilePath, PATH_MAX,"%s",Arg);
+  
+  if (Py_IsInitialized()) {
+    pyfd = fopen(pyFilePath, "r");
+    if (pyfd == NULL) {
+      myResult = SD_PyEr_NOF;  /* failed to open file, could look at global variable errno ?*/
+    }else{
+      pyscriptname = basename(pyFilePath);  /* rem The basename() function may modify the string pointed to by path */
+      PyObject *prun = PyRun_File(pyfd,pyscriptname,Py_file_input, global_dict, global_dict);    /* run statements */
+      if (prun == NULL){
+      /* exception */
+        myResult = SD_PyEr_Excpt;
+        PyErr_Print();
+      } else {
+         Py_DECREF(prun);
+      }
+      fclose(pyfd);
+    }  
+  }else{
+    myResult = SD_PyEr_NotInit;  
+  }  
+  return_status(myResult);
+  return myResult;
+}
 
-  PyObject *pval, *prun;
+/* Take the string in Arg passed from op_sdme_ext (from SDME.EXT Arg value) and treat as the python variable to return   */
+int sdext_SD_PyGetAtt(const char* Arg){
+  PyObject *pval;
   char nullresult[] = "";
+     /* PyMapping_GetItemString - Fetches (indexes) a dictionary value by key
+       "Besides allowing you to partition code string namespaces independent of any Python
+        module files on the underlying system, this scheme provides a natural communication
+        mechanism. Values that are stored in the new dictionary before code is run serve as
+        inputs, and names assigned by the embedded code can later be fetched out of the dictionary
+        to serve as code outputs." from Programming Python 4th edition, Basic Embedding Techniques,
+         Running Strings in Dictionaries       */
+   
+  /* access the python dictionary entry for the object we are after */
   
-  process.status = 0;   /* setup status() value */
-  myResult = 0;         /* init result response */
-  /*Evaluate KEY */
-  
-  switch (key) {
-
-    case SD_PyInit: /* Initialize python */
-      if (!Py_IsInitialized()) {  /* only initialize if not already so */
-        myResult = sd_event_queue_init();
-        if (myResult != 0)
-          break;
-
-        if (!sd_module_registered) {
-          if (PyImport_AppendInittab("sd", &PyInit_sd) == -1) {
-            myResult = SD_PyErr_MainMod;
-            break;
-          }
-          sd_module_registered = TRUE;
-        }
-
-        Py_Initialize();          /* There is no return value; it is a fatal error if the initialization fails. */
-       /* "dictionaries that serve as namespaces for running code are generally required 
-        to have a __builtins__ link to the built-in scope searched last for name lookups"
-        from Programming Python 4th edition, Basic Embedding Techniques,
-        Running Strings in Dictionaries       */
-        if (Py_IsInitialized()) {     /* did initialization succeed? */
-          // 1. Get the main module rem Borrowed reference
-          main_module = PyImport_AddModule("__main__");  
-          if (main_module == NULL) {
-            PyErr_Print();
-            myResult = SD_PyErr_MainMod;  /* could get main module bad news! */
-          }else{
-          // 2. Get the main (global) dictionary rem Borrowed reference
-            global_dict = PyModule_GetDict(main_module);
-            if (global_dict == NULL) {
-              PyErr_Print();
-              myResult = SD_PyErr_GlobDict;  /* could get __main__ dictionary bad news! */
-            }
-
-            if (myResult == 0) {
-              PyObject *sd_module = PyImport_ImportModule("sd");
-              if (sd_module == NULL) {
-                PyErr_Print();
-                myResult = SD_PyErr_MainMod;
-              } else {
-                Py_DECREF(sd_module);
-              }
-            }
-
-          }
-
-
-        }else{
-          myResult =  SD_PyEr_NotInit; /* initialization failed */
-        }
-     
-      } 
-      process.status = myResult;
-      InitDescr(e_stack, INTEGER);
-      (e_stack++)->data.value = (int32_t)myResult;
-      break;
-
-    case SD_PyFinal: /* Finalize the python interpreter   */
-      /* rem  global_dict, main_module are Borrowed Reference  */
-                  
-      myResult = sdext_py_finalize();
-      
-      process.status = myResult;
-      InitDescr(e_stack, INTEGER);
-      (e_stack++)->data.value = (int32_t)myResult;
-
-      break;
-
-    case SD_IsPyInit: /* Is python interpreter initialized?   */
-                  
-      myResult = Py_IsInitialized();
-
-      InitDescr(e_stack, INTEGER);
-      (e_stack++)->data.value = (int32_t)myResult;
-      break;
-
-    case SD_PyGuiStep:
-      if (Py_IsInitialized())
-        myResult = sd_py_gui_step();
-      else
-        myResult = SD_PyEr_NotInit;
-      process.status = myResult;
-      InitDescr(e_stack, INTEGER);
-      (e_stack++)->data.value = (int32_t)myResult;
-      break;
-
-    case SD_PyPoll:
-      if (Py_IsInitialized())
-        (void)sd_py_poll();
-      else {
-        process.status = SD_PyEr_NotInit;
-        k_put_c_string(nullresult, e_stack);
-        e_stack++;
-      }
-      break;
-
-    case SD_PyGuiWinUpdate:
-      if (Py_IsInitialized()){
-        // FreeSimpleGUI must have been imported in script as sg 
-        PyObject *mod = PyImport_ImportModule(PyGuiModule);
-        if (mod != NULL) {
-          // Arg: "My Window", Arg2: "my_key", Arg3: "new text"
-          myResult = sd_py_update_key_value_in_window(Arg, Arg2, Arg3);
-          Py_DECREF(mod);
-        } else {
-          fprintf(stderr, "%s Module not found, is 'Import %s as sg' in your script?:\n",PyGuiModule,PyGuiModule);
-          PyErr_Print();
-          myResult = SD_PyErr_NoFreeGui;
-        }
-      } else {
-        myResult = SD_PyEr_NotInit;
-      }
-      process.status = myResult;
-      InitDescr(e_stack, INTEGER);
-      (e_stack++)->data.value = (int32_t)myResult;
-      break;
-    
-    case SD_PyGuiWinUpdateS:
-      if (Py_IsInitialized()){
-        // FreeSimpleGUI must have been imported in script as sg 
-        PyObject *mod = PyImport_ImportModule(PyGuiModule);
-        if (mod != NULL) {
-          // Arg: "My Window", Arg2: vm list of keys, Arg3: vm list of values
-          myResult = sd_py_update_multi_key_value_in_window(Arg, Arg2, Arg3);
-          Py_DECREF(mod);
-        } else {
-          fprintf(stderr, "%s Module not found, is 'Import %s as sg' in your script?:\n",PyGuiModule,PyGuiModule);
-          PyErr_Print();
-          myResult = SD_PyErr_NoFreeGui;
-        }
-      } else {
-        myResult = SD_PyEr_NotInit;
-      }
-      process.status = myResult;
-      InitDescr(e_stack, INTEGER);
-      (e_stack++)->data.value = (int32_t)myResult;
-      break;
-
-    case SD_PyGuiWinUpdValues:
-      if (Py_IsInitialized()){
-        // FreeSimpleGUI must have been imported in script as sg 
-        PyObject *mod = PyImport_ImportModule(PyGuiModule);
-        if (mod != NULL) {
-          // Arg: "My Window", Arg2: "my_key", Arg3: "list object name"
-          //sd_py_update_window_values_list(PyObject* module, const char *window_name, const char *key_name, const char *listname)
-          myResult = sd_py_update_window_values_list(Arg, Arg2, Arg3);
-          Py_DECREF(mod);
-        } else {
-          fprintf(stderr, "%s Module not found, is 'Import %s as sg' in your script?:\n",PyGuiModule,PyGuiModule);
-          PyErr_Print();
-          myResult = SD_PyErr_NoFreeGui;
-        }
-      } else {
-        myResult = SD_PyEr_NotInit;
-      }
-      process.status = myResult;
-      InitDescr(e_stack, INTEGER);
-      (e_stack++)->data.value = (int32_t)myResult;
-      break;  
-
-
-    case SD_PyGuiTableSet:
-      /* populate existing list with table data from dyn array */
-      if (Py_IsInitialized()){
-        // FreeSimpleGUI must have been imported in script as sg 
-
-        // Arg: table list name, Arg2: dyn list for table data
-        myResult = sd_py_table_set(Arg, Arg2);
-
-      } else {
-        myResult = SD_PyEr_NotInit;
-      }
-      process.status = myResult;
-      InitDescr(e_stack, INTEGER);
-      (e_stack++)->data.value = (int32_t)myResult;
-      break;  
-
-    case SD_PyGuiTableGet:   
-      /* get (read) Gui table list data in dyn array */
-      
-      if (!Py_IsInitialized()) {
-      /* we dont have a running python interpreter */
-        process.status = SD_PyEr_NotInit;
-        k_put_c_string(nullresult, e_stack);   /* sets descr as type string and place empty string value into it */
-        e_stack++;
-      } else {
-      sd_py_table_get(Arg);           
-      // rem sd_py_table_get:
-      // populates the sd data object pointed to by e_stack with k_put_c_string(c string, e_stack)  
-      // inc the stack pointer e_stack++
-      // sets process.status
-      }
-
-    case SD_PyCallFunction:
-      if (Py_IsInitialized()){
-        // Arg: "Function Name", Arg2: "Function Arg", Arg3: "Function Arg", Arg4: "Function Arg, Arg5: "Function Arg"
-        // static int sd_py_call_function(const char *function_name, const char *Arg1, const char *ArgType1, const char *Arg2, const char *ArgType2,const char *Arg3, const char *ArgType3)
-        sd_py_call_function(Arg, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7);
-      }else{
-        process.status = SD_PyEr_NotInit;
-        k_put_c_string(nullresult, e_stack);   /* sets descr as type string and place empty string value into it */
-        e_stack++; 
-      }  
-      break;
-
-    case SD_PyRunStr:   /* Take the string in Arg passed from op_sdme_ext (from SDME.EXT Arg value) and run in python interpreter  */
-                         
-      if (Py_IsInitialized()) {
-        prun = PyRun_String(Arg, Py_file_input, global_dict, global_dict);    /* run statements */
-        if (prun == NULL){
-        /* exception */
-          myResult = SD_PyEr_Excpt;
-          PyErr_Print();
-        } else {
-          Py_DECREF(prun);
-        }
-      }else{
-        myResult = SD_PyEr_NotInit;  
-      }  
-      
-      process.status = myResult;
-      InitDescr(e_stack, INTEGER);
-      (e_stack++)->data.value = (int32_t)myResult;
-      break; 
-
-    case SD_PyRunFile:   /* Take the string in Arg passed from op_sdme_ext (from SDME.EXT Arg value) and treat as a file to run in python interpreter   */
-                            /* must move to pyFilePath[PATH_MAX]   */
-	    snprintf(pyFilePath, PATH_MAX,"%s",Arg);
-
-      if (Py_IsInitialized()) {
-        pyfd = fopen(pyFilePath, "r");
-        if (pyfd == NULL) {
-          myResult = SD_PyEr_NOF;  /* failed to open file, could look at global variable errno ?*/
-        }else{
-          pyscriptname = basename(pyFilePath);  /* rem The basename() function may modify the string pointed to by path */
-          prun = PyRun_File(pyfd,pyscriptname,Py_file_input, global_dict, global_dict);    /* run statements */
-          if (prun == NULL){
-          /* exception */
-            myResult = SD_PyEr_Excpt;
-            PyErr_Print();
-          } else {
-             Py_DECREF(prun);
-          }
-          fclose(pyfd);
-        }  
-      }else{
-        myResult = SD_PyEr_NotInit;  
-      }  
-      process.status = myResult;
-      InitDescr(e_stack, INTEGER);
-      (e_stack++)->data.value = (int32_t)myResult;
-      break;      
-
-    case SD_PyGetAtt:   /* Take the string in Arg passed from op_sdme_ext (from SDME.EXT Arg value) and treat as the python variable to return   */
-
-         /* PyMapping_GetItemString - Fetches (indexes) a dictionary value by key
-           "Besides allowing you to partition code string namespaces independent of any Python
-            module files on the underlying system, this scheme provides a natural communication
-            mechanism. Values that are stored in the new dictionary before code is run serve as
-            inputs, and names assigned by the embedded code can later be fetched out of the dictionary
-            to serve as code outputs." from Programming Python 4th edition, Basic Embedding Techniques,
-             Running Strings in Dictionaries       */
-       
-      /* access the python dictionary entry for the object we are after */
-      
-      if (!Py_IsInitialized()) {
-      /* we dont have a running python interpreter */
-        process.status = SD_PyEr_NotInit;
-        k_put_c_string(nullresult, e_stack);   /* sets descr as type string and place the python value into it */
-        e_stack++;
-        break;
-      }
-      pval =  PyMapping_GetItemString(global_dict, Arg);             /* get my result object */
-      /* convet to string, note obj_to_str handles any errors   from PyMapping_GetItemString */
-      obj_to_str(pval);
-      e_stack++;
-      break;
+  if (!Py_IsInitialized()) {
+  /* we dont have a running python interpreter */
+    process.status = SD_PyEr_NotInit;
+    k_put_c_string(nullresult, e_stack);   /* sets descr as type string and place the python value into it */
+    e_stack++;
+  } else {
+  pval =  PyMapping_GetItemString(global_dict, Arg);             /* get my result object */
+  /* convet to string, note obj_to_str handles any errors   from PyMapping_GetItemString and ref cnt for pval */
+  obj_to_str(pval);
+  e_stack++;
   }
+  return process.status;
+}
 
-  return;
+/* SD_PyGuiStep  Calls the python function "gui_step" found in the python script being run to enable build in GUI  */
+/* This function is called in the Cooperative Scheduler loop of the BASIC program controlling the GUI window       */
+/* see sd64/Documentation/SD GUI Python Cooperative Schedule.txt for more information                              */
+int sdext_SD_PyGuiStep(){
+  int myResult;
+  myResult = 0;
+  if (Py_IsInitialized()){
+    myResult = sd_py_gui_step();
+  }else{
+    myResult = SD_PyEr_NotInit;
+  }
+  return_status(myResult);
+  return myResult;
+}
+
+
+/* SD_PyPoll consumes the queued Python event                                                                      */
+/* see sd64/Documentation/SD GUI Python Cooperative Schedule.txt for more information                              */
+int sdext_SD_PyPoll(){
+  char nullresult[] = "";
+  if (Py_IsInitialized()){
+    process.status = sd_py_poll();
+  }else{
+    process.status = SD_PyEr_NotInit;
+    k_put_c_string(nullresult, e_stack);
+    e_stack++;
+  }
+  return process.status;
+}
+
+
+/* SD_PyGuiWinUpdate update PyGui Window's Gui Objects value                            */
+/* mimics python statement window['YOUR_ELEMENT_KEY'].update(new_value)                 */
+/* Arg: "My Window", Arg2: "my_key", Arg3: "new text"                                   */
+int sdext_SD_PyGuiWinUpdate(const char *Arg, const char *Arg2, const char *Arg3){ 
+  int myResult;
+  myResult = 0;
+  
+  if (Py_IsInitialized()){
+    // FreeSimpleGUI must have been imported in script as sg 
+    PyObject *mod = PyImport_ImportModule(PyGuiModule);
+    if (mod != NULL) {
+      // Arg: "My Window", Arg2: "my_key", Arg3: "new text"
+      myResult = sd_py_update_key_value_in_window(Arg, Arg2, Arg3);
+      Py_DECREF(mod);
+    } else {
+      fprintf(stderr, "%s Module not found, is 'Import %s as sg' in your script?:\n",PyGuiModule,PyGuiModule);
+      PyErr_Print();
+      myResult = SD_PyErr_NoFreeGui;
+    }
+  } else {
+    myResult = SD_PyEr_NotInit;
+  }
+  return_status(myResult);
+  return myResult;
+}
+
+
+/* SD_PyGuiWinUpdateS  update multi PyGui Window's Gui Object values                                   */
+/* Arg: "My Window", Arg2: vm list of keys, Arg3: vm list of values                                    */
+int sdext_SD_PyGuiWinUpdateS(const char *Arg, const char *Arg2, const char *Arg3){ 
+  int myResult;
+  myResult = 0;
+
+  if (Py_IsInitialized()){
+    // FreeSimpleGUI must have been imported in script as sg 
+    PyObject *mod = PyImport_ImportModule(PyGuiModule);
+    if (mod != NULL) {
+      // Arg: "My Window", Arg2: vm list of keys, Arg3: vm list of values
+      myResult = sd_py_update_multi_key_value_in_window(Arg, Arg2, Arg3);
+      Py_DECREF(mod);
+    } else {
+      fprintf(stderr, "%s Module not found, is 'Import %s as sg' in your script?:\n",PyGuiModule,PyGuiModule);
+      PyErr_Print();
+      myResult = SD_PyErr_NoFreeGui;
+    }
+  } else {
+    myResult = SD_PyEr_NotInit;
+  }
+  return_status(myResult);
+  return myResult;
+}
+
+
+
+
+/* SD_PyGuiWinUpdValues   update PyGui Window's Gui Object's values parameter                             */
+/*                        necessary for dealing with objects with the Values attribute (Combo / Tables)   */
+int sdext_SD_PyGuiWinUpdValues(const char *Arg, const char *Arg2, const char *Arg3){ 
+  int myResult;
+  myResult = 0;
+  
+  if (Py_IsInitialized()){
+    // FreeSimpleGUI must have been imported in script as sg 
+    PyObject *mod = PyImport_ImportModule(PyGuiModule);
+    if (mod != NULL) {
+      // Arg: "My Window", Arg2: "my_key", Arg3: "list object name"
+      //sd_py_update_window_values_list(PyObject* module, const char *window_name, const char *key_name, const char *listname)
+      myResult = sd_py_update_window_values_list(Arg, Arg2, Arg3);
+      Py_DECREF(mod);
+    } else {
+      fprintf(stderr, "%s Module not found, is 'Import %s as sg' in your script?:\n",PyGuiModule,PyGuiModule);
+      PyErr_Print();
+      myResult = SD_PyErr_NoFreeGui;
+    }
+  } else {
+    myResult = SD_PyEr_NotInit;
+  }
+  return_status(myResult);
+  return myResult;
+} 
+
+/*     case SD_PyGuiTableSet                                         */
+/* populate existing list with table data from dyn array             */
+/* Arg: table list name, Arg2: dyn array for table data              */
+int sdext_SD_PyGuiTableSet(const char *Arg, const char *Arg2){ 
+  int myResult;
+  myResult = 0;
+
+  if (Py_IsInitialized()){
+    // Arg: table list name, Arg2: dyn array for table data
+    myResult = sd_py_table_set(Arg, Arg2);
+
+  } else {
+    myResult = SD_PyEr_NotInit;
+  }
+  return_status(myResult);
+  return myResult;
+}
+
+
+/* SD_PyGuiTableGet get (read) Gui table list data into dyn array                             */
+/* populates the sd data object pointed to by e_stack with k_put_c_string(c string, e_stack)  */
+/* dyn array ends up with rows delimeted by @vm, columns by @svm                              */
+/* for this to work the python script must move the table data from the Table object into a   */
+/* the local list Arg                                                                         */
+/* The usefulness of this function has been reduced by the ability to call functions          */
+/*  SD_PyCallFunction and SD_PyCallFunctionS                                                  */
+
+int sdext_SD_PyGuiTableGet(const char *Arg){  
+  char nullresult[] = "";
+  /* get (read) Gui table list data in dyn array */
+  
+  if (!Py_IsInitialized()) {
+  /* we dont have a running python interpreter */
+    process.status = SD_PyEr_NotInit;
+    k_put_c_string(nullresult, e_stack);   /* sets descr as type string and place empty string value into it */
+    e_stack++;
+  } else {
+    sd_py_table_get(Arg);           
+    // rem sd_py_table_get:
+    // populates the sd data object pointed to by e_stack with k_put_c_string(c string, e_stack)  
+    // inc the stack pointer e_stack++
+    // sets process.status
+  }
+return process.status;
+}
+
+
+/* SD_PyCallFunction  call function pre defined in loaded (sdext_SD_PyRunFile) python script                         */
+/* Arg: "Function Name", Arg2: "result_name", Arg3: "Function Arg1", Arg4: "Function Arg2, Arg5: "Function Arg3"     */
+/*                                            Arg6: "Function Arg4", Arg7: "Function Arg5"                           */
+int sdext_SD_PyCallFunction(const char *Arg, const char *Arg2, const char *Arg3, const char *Arg4, const char *Arg5, const char *Arg6, const char *Arg7){ 
+  int myResult;
+  myResult = 0;
+  if (Py_IsInitialized()){
+    /* rem  sd_py_call_function performs return_status(myResult)            */
+    myResult = sd_py_call_function(Arg, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7);
+  }else{ 
+    myResult = SD_PyEr_NotInit; 
+    return_status(myResult);
+  }
+  return myResult;
+}
+      
+/* SD_PyCallFunctionS  call function pre defined in loaded (sdext_SD_PyRunFile) python script                                             */
+/* Arg: "Function Name", Arg2: "Function Arg1", Arg3: "Function Arg2, Arg4: "Function Arg3, Arg5: "Function Arg4", Arg6: "Function Arg5"  */
+/* This version returns the python function result as a string to the vm                                                                  */
+int sdext_SD_PyCallFunctionS(const char *Arg, const char *Arg2, const char *Arg3, const char *Arg4, const char *Arg5, const char *Arg6){ 
+  char nullresult[] = "";
+  if (Py_IsInitialized()){
+    // Arg: "Function Name", Arg2: "Function Arg", Arg3: "Function Arg", Arg4: "Function Arg, Arg5: "Function Arg"
+    // version returns cstring to vm
+    process.status = sd_py_call_functionS(Arg, Arg2, Arg3, Arg4, Arg5, Arg6);
+  }else{
+    process.status = SD_PyEr_NotInit;
+    k_put_c_string(nullresult, e_stack);   /* sets descr as type string and place empty string value into it */
+    e_stack++; 
+  }  
+  return process.status;  
 }
 
 /* shut down python */
@@ -447,13 +515,6 @@ int sdext_py_finalize(void){
 
 int sd_py_call_function(const char *function_name, const char *result_name, const char *Arg1, const char *Arg2, const char *Arg3,const char *Arg4, const char *Arg5){
  
- // rtnNull return a null value in the sd string descriptor pointed to by estack and inc the stack
-  #define return_status(stat){\
-    process.status = stat;\
-    InitDescr(e_stack, INTEGER);\
-    (e_stack++)->data.value = (int32_t)process.status;\
-  }
-
   int argcnt;
   PyObject *pArg1, *pArg2, *pArg3, *pArg4, *pArg5, *pResult_Name, *pResult_Value;
 
@@ -625,6 +686,177 @@ int sd_py_call_function(const char *function_name, const char *result_name, cons
   }
 
   return process.status;
+}
+
+
+/* **************************************************************************************************************** */
+/* Function to call python module function, returns cstring into VM result                                          */
+/* Arg: "Function Name",   Arg1 -5 : "Function Arg"                                                                 */
+/* REM we assume function is local to script OR imported by the prior execute script                                */
+/* Either way the assumption is these are names of objects  available in __main__                                   */
+/* Routine handles varible arg count by assuming first NULL arg segnifies the end of passed arguments AND sets      */
+/*  the number of arguments to pass to the python function, kind of a kludge                                        */
+/* **************************************************************************************************************** */
+
+int sd_py_call_functionS(const char *function_name, const char *Arg1, const char *Arg2, const char *Arg3,const char *Arg4, const char *Arg5){
+ 
+  char nullresult[] = "";
+  
+  // rtnNull return a null value in the sd string descriptor pointed to by estack and inc the stack
+  #define rtnNull(){\
+    k_put_c_string(nullresult, e_stack);\
+    e_stack++;\
+  }
+
+  int argcnt;
+  PyObject *pArg1, *pArg2, *pArg3, *pArg4, *pArg5, *pResult_Value;
+
+  PyObject *pMainModule = PyImport_ImportModule("__main__");
+  if (pMainModule == NULL) {
+      PyErr_Print();
+      rtnNull();
+      return SD_PyErr_MainScope ;
+  }
+
+  PyObject *pFunction = PyObject_GetAttrString(pMainModule,function_name);
+  Py_DECREF(pMainModule);
+  if (pFunction == NULL) {
+      fprintf(stderr, "Function %s not found\n\r",function_name);
+      PyErr_Print();
+      rtnNull();
+      return SD_PyErr_ObjNOF ;
+      
+  }
+
+
+  if (PyCallable_Check(pFunction)) {
+ 
+    // figure out number of args
+    // I know this is ugly but it is what I am doing
+    argcnt = 0;   // default to no args
+    if (Arg1 != NULL){
+      argcnt = 1;
+      pArg1 = lookup_dict_item(global_dict, Arg1);
+      if (pArg1 == NULL) {
+      /* obj does not exist, report error */
+        Py_DECREF(pFunction);
+        rtnNull();
+        return SD_PyErr_ObjNOF ;
+       }
+    }
+    if (Arg2 != NULL){
+      argcnt = 2;
+      pArg2 = lookup_dict_item(global_dict, Arg2);
+      if (pArg2 == NULL) {
+      /* obj does not exist, report error */
+        Py_DECREF(pFunction);
+        Py_DECREF(pArg1);
+        rtnNull();
+        return SD_PyErr_ObjNOF ;
+       }
+    }
+    if (Arg3 != NULL){
+      argcnt = 3;
+      pArg3 = lookup_dict_item(global_dict, Arg3);
+      if (pArg3 == NULL) {
+      /* obj does not exist, report error */
+        Py_DECREF(pFunction);
+        Py_DECREF(pArg1);
+        Py_DECREF(pArg2);
+        rtnNull();
+        return SD_PyErr_ObjNOF ;
+       }
+    }
+    if (Arg4 != NULL){
+      argcnt = 4;
+      pArg4 = lookup_dict_item(global_dict, Arg4);
+      if (pArg4 == NULL) {
+      /* obj does not exist, report error */
+        Py_DECREF(pFunction);
+        Py_DECREF(pArg1);
+        Py_DECREF(pArg2);
+        Py_DECREF(pArg3);
+        rtnNull();
+        return SD_PyErr_ObjNOF ;
+       }
+    }
+    if (Arg5 != NULL){
+      argcnt = 5;
+      pArg5 = lookup_dict_item(global_dict, Arg5);
+      if (pArg5 == NULL) {
+      /* obj does not exist, report error */
+        Py_DECREF(pFunction);
+        Py_DECREF(pArg1);
+        Py_DECREF(pArg2);
+        Py_DECREF(pArg3);
+        Py_DECREF(pArg4);
+        rtnNull();
+        return SD_PyErr_ObjNOF ;
+       }
+    }
+    
+    // Execute the Python function
+    // Pass the arguments followed by NULL to signal the end of arguments
+    switch (argcnt){
+        case 0:
+           pResult_Value = PyObject_CallFunctionObjArgs(pFunction, NULL);
+           break;
+        case 1:
+           pResult_Value = PyObject_CallFunctionObjArgs(pFunction, pArg1,NULL);
+           Py_DECREF(pArg1);
+           break;
+        case 2:
+           pResult_Value = PyObject_CallFunctionObjArgs(pFunction, pArg1, pArg2, NULL);
+           Py_DECREF(pArg1);
+           Py_DECREF(pArg2);
+           break;
+        case 3:
+           pResult_Value = PyObject_CallFunctionObjArgs(pFunction, pArg1, pArg2, pArg3, NULL);
+           Py_DECREF(pArg1);
+           Py_DECREF(pArg2);
+           Py_DECREF(pArg3);
+           break;  
+        case 4:
+           pResult_Value = PyObject_CallFunctionObjArgs(pFunction, pArg1, pArg2, pArg3, pArg4, NULL);
+           Py_DECREF(pArg1);
+           Py_DECREF(pArg2);
+           Py_DECREF(pArg3);
+           Py_DECREF(pArg4);
+           break; 
+        case 5:
+           pResult_Value = PyObject_CallFunctionObjArgs(pFunction, pArg1, pArg2, pArg3, pArg4, pArg5, NULL);
+           Py_DECREF(pArg1);
+           Py_DECREF(pArg2);
+           Py_DECREF(pArg3);
+           Py_DECREF(pArg4);
+           Py_DECREF(pArg5);
+           break;
+
+    }
+    Py_DECREF(pFunction);
+    
+    if (pResult_Value != NULL) {
+      // return result as string to VM
+      // rem obj_to_str handles PResult_Value ref count
+      obj_to_str(pResult_Value);
+      e_stack++;
+      return 0;
+
+
+    } else {
+        // Handle Python exceptions during execution
+        PyErr_Print();
+        fprintf(stderr, "Python function call failed\n\r");
+        rtnNull();
+        return SD_PyErr_FuncFail;
+    }
+    
+   
+  } else {
+      fprintf(stderr, "Function %s is not callable\n\r",function_name);
+      rtnNull();
+      return SD_PyErr_FuncFail;
+  }
 }
 
 

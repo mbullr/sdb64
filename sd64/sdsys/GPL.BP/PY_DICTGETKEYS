@@ -24,7 +24,7 @@
 * key_list = PY_DICTGETKEYS(dictname)
 *
 * dictname - name of python dictionary to access
-* key_list - tab separated list of dictionary keys
+* key_list - @fm separated list of dictionary keys
 *                   status() - 0 on success, error code as defined in ERR.H
 *
 * END-DESCRIPTION

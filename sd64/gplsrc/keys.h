@@ -368,7 +368,8 @@
 #define  SD_IsPyInit      2002  /* Is python interpreter initialized   */
 #define  SD_PyRunStr      2010  /* Take the string in qmBasic variable VAL and run in python interpreter   */
 #define  SD_PyRunFile     2011  /* Take the file and path defined in qmBasic variable VAL and run in python interpreter   */
-#define  SD_PyCallFunction 2012 /* call a python modules function */
+#define  SD_PyCallFunction 2012 /* call a python modules function resulsts stored in python object */
+#define  SD_PyCallFunctionS 2013 /* call python function and return string to VM */
 
 #define  SD_PyGuiStep     2020  /* Process one bounded Python GUI event step */
 #define  SD_PyPoll        2021  /* Return the next queued Python GUI event */

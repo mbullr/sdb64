@@ -350,6 +350,18 @@ rtn_st = PY_CALLFUNCTION('blist','countdown')
 crt  'status() = ':status()
 crt  'rtn_st  = ':rtn_st
 crt str('=',50)
+
+crt 'call functions '
+rtn_str = PY_CALLFUNCTIONS('func1','blist')
+crt  'status() = ':status()
+crt  'rtn_str  = ':rtn_str
+crt str('=',50)
+
+crt 'call functions with invalid function name (nof)'
+rtn_str = PY_CALLFUNCTIONS('funcx','blist')
+crt  'status() = ':status()
+crt  'rtn_str  = ':rtn_str
+crt str('=',50)
 *
 * don't finalize, we will check when sd closes
 999: crt 'complete'

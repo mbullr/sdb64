@@ -1,0 +1,57 @@
+* PY_CALLFUNCTIONS
+* execute python function and return results as string
+* Copyright (c)2026 The SD Developers, All Rights Reserved
+*
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation; either version 3, or (at your option)
+* any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software Foundation,
+* Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+*
+* START-HISTORY:
+* rev 1.0-3 
+* END-HISTORY
+* START-DESCRIPTION:
+*
+* rtn_str = PY_CALLFUNCTIONS(function_name,arg1,arg2,arg3,arg4,arg5)
+*
+* function_name - name of python function previously imported into interpreter (found in __main__ scope) 
+* arg1- arg5  - names of python objects previously created in interpreter (found in __main__ scope)
+*                   status() - 0 on success, error code as defined in ERR.H
+* rtn_str     - string returned from python function call
+* END-DESCRIPTION
+*
+* START-CODE
+
+$internal
+$no.symbols
+$no.xref
+function py_callfunctions(function_name,arg1,arg2,arg3,arg4,arg5) VAR.ARGS
+$catalog !py_callfunctions
+
+$include KEYS.H
+$include ERR.H
+
+UpdateArgs = function_name
+
+passed.args = arg.count()
+
+if passed.args > 1 then UpdateArgs<-1> = arg1
+if passed.args > 2 then UpdateArgs<-1> = arg2
+if passed.args > 3 then UpdateArgs<-1> = arg3
+if passed.args > 4 then UpdateArgs<-1> = arg4
+if passed.args > 5 then UpdateArgs<-1> = arg5
+
+rtn_str = SDEXT(UpdateArgs, @TRUE, SD_PyCallFunctionS)
+*
+return rtn_str
+
+end

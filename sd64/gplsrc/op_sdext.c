@@ -186,11 +186,13 @@ void op_sdext() {
         argCnt = 1;                       /* always one args */
         SDMEArgArray[0] = myval_buffer;   /* we just point to the value buffer created earlier */  
     }
-  }   
-  
+  }
+  //  
+  // dispatch logic
+  //
   switch (key) {
       
-      case  SDEXT_TestIt: 
+    case  SDEXT_TestIt: 
     /* simple test to see if any of this works, output args to stdout  */
         for (argIdx = 0; argIdx < argCnt; argIdx++) {
           printf("Arg %d of %d\r\n",argIdx+1, argCnt);
@@ -242,30 +244,67 @@ void op_sdext() {
       break;
 
     /* 20240808 mab embedding python? */
+    /* REM !! all these functions are expected to:                    */
+    /*    handle setting process.status                               */
+    /*    populate descriptor pointed to by estack and inc the stack  */
     #ifdef EMBED_PYTHON
-    case SD_PyInit:  
-    case SD_PyFinal:  
-    case SD_IsPyInit: 
-    case SD_PyRunStr:  
-    case SD_PyRunFile: 
-    case SD_PyGetAtt :
-    case SD_PyGuiStep:
-    case SD_PyPoll:
-  /* embedding Python functions*/
-      sdext_py(key, SDMEArgArray[0], NULL, NULL,NULL,NULL,NULL,NULL);
+    case SD_PyInit: 
+      sdext_SD_PyInit();
       break;
+      
+    case SD_PyFinal:  
+       sdext_SD_PyFinal();
+       break;
+       
+    case SD_IsPyInit: 
+      sdext_SD_IsPyInit();
+      break;
+   
+    case SD_PyRunStr: 
+      if (argCnt != 1){
+        sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 1 args for this to work */
+      }else{
+        sdext_SD_PyRunStr(SDMEArgArray[0]);
+      }
+      break;
+    
+    case SD_PyRunFile: 
+      if (argCnt != 1){
+        sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 1 args for this to work */
+      }else{
+        sdext_SD_PyRunStr(SDMEArgArray[0]);
+      }
+      break;
+
+    case SD_PyGetAtt :
+      if (argCnt != 1){
+        sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 1 args for this to work */
+      }else{
+        sdext_SD_PyGetAtt(SDMEArgArray[0]);
+      }
+      break;
+      
+    case SD_PyGuiStep:
+      sdext_SD_PyGuiStep();
+      break;
+      
+    case SD_PyPoll:
+      sdext_SD_PyPoll();
+      break;
+      
     case SD_PyGuiWinUpdate:
       if (argCnt != 3){
         sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 3 args for this to work */
       }else{
-        sdext_py(SD_PyGuiWinUpdate, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2],NULL,NULL,NULL,NULL);
+        sdext_SD_PyGuiWinUpdate(SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2]);
       }
       break;
+      
     case SD_PyGuiWinUpdateS:
       if (argCnt != 3){
         sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 3 args for this to work */
       }else{
-        sdext_py(SD_PyGuiWinUpdateS, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2],NULL,NULL,NULL,NULL);
+        sdext_SD_PyGuiWinUpdateS(SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2]);
       }
       break;
 
@@ -273,7 +312,7 @@ void op_sdext() {
       if (argCnt != 3){
         sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 3 args for this to work */
       }else{
-        sdext_py(SD_PyGuiWinUpdValues, SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2],NULL,NULL,NULL,NULL);
+        sdext_SD_PyGuiWinUpdValues(SDMEArgArray[0], SDMEArgArray[1], SDMEArgArray[2]);
       }
       break;
 
@@ -281,21 +320,33 @@ void op_sdext() {
       if (argCnt != 2){
         sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 2 args for this to work */
       }else{
-        sdext_py(SD_PyGuiTableSet, SDMEArgArray[0], SDMEArgArray[1],NULL,NULL,NULL,NULL,NULL);
+        sdext_SD_PyGuiTableSet(SDMEArgArray[0], SDMEArgArray[1]);
       }
       break;  
 
     case SD_PyGuiTableGet:
-      if (argCnt != 2){
-        sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 2 args for this to work */
+      if (argCnt != 1){
+        sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 1 args for this to work */
       }else{
-        sdext_py(SD_PyGuiTableGet, SDMEArgArray[0], SDMEArgArray[1],NULL,NULL,NULL,NULL,NULL);
+        sdext_SD_PyGuiTableGet(SDMEArgArray[0]);
       }
       break;  
       
     case SD_PyCallFunction:
-      sdext_py(SD_PyCallFunction, SDMEArgArray[0], SDMEArgArray[1],SDMEArgArray[2],SDMEArgArray[3],SDMEArgArray[4],SDMEArgArray[5],SDMEArgArray[6]);
-      break;    
+      if (argCnt < 2){
+        sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 2 or more args for this to work */
+      }else{
+        sdext_SD_PyCallFunction(SDMEArgArray[0], SDMEArgArray[1],SDMEArgArray[2],SDMEArgArray[3],SDMEArgArray[4],SDMEArgArray[5],SDMEArgArray[6]);
+      }
+      break;  
+
+    case SD_PyCallFunctionS:
+      if (argCnt < 1){
+        sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 1 or more args for this to work */
+      }else{
+        sdext_SD_PyCallFunctionS(SDMEArgArray[0], SDMEArgArray[1],SDMEArgArray[2],SDMEArgArray[3],SDMEArgArray[4],SDMEArgArray[5]);
+      }
+      break; 
 
    #endif  
 

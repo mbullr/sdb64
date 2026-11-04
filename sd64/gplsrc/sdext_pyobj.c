@@ -966,6 +966,7 @@ PyObject* List_To_String(PyObject* list, int sep_char){
 /***************************************************************************************************************************/
 /*  convert python object to string                                                                                        */
 /*  this routine is responsible for ref count of passed python object pval                                                 */
+/*  caller is responsible for e_stack (must inc)                                                                           */
 /***************************************************************************************************************************/
 
 void obj_to_str(PyObject* pval){
