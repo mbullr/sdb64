@@ -659,6 +659,7 @@ void sd_py_table_get(const char *pylist_name){
   Py_DECREF(sep_str);
   /* convet to string, note obj_to_str handles any errors   from PyMapping_GetItemString */
   obj_to_str(result_str);
+  e_stack++;
   Py_DECREF(ptable_list);
   return;
 }

@@ -23,6 +23,10 @@
 *
 * returned_status = PY_GUITABLESET(table_list_name,dyn_array)
 *
+* Note PY_GUITABLESET APPENDS the data in dyn_array to list table_list_name.
+*      If you must clear table_list_name with PY_LISTCLR(table_list_name) before 
+*      calling PY_GUITABLESET if this is not the desired outcome.
+*
 * object_name - object name of window created with  "window = sg.Window(....)
 * dyn_array - dynamic array string
 *              row 1 : col data <svm> col data <svm> col data <vm>

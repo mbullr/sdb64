@@ -169,9 +169,7 @@ int sdext_SD_PyInit(){
         if (global_dict == NULL) {
           PyErr_Print();
           myResult = SD_PyErr_GlobDict;  /* could get __main__ dictionary bad news! */
-        }
-
-        if (myResult == 0) {
+        } else {
           PyObject *sd_module = PyImport_ImportModule("sd");
           if (sd_module == NULL) {
             PyErr_Print();
