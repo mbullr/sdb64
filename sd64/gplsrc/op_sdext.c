@@ -272,7 +272,7 @@ void op_sdext() {
       if (argCnt != 1){
         sdme_err_rsp(SD_EXT_ARG_CNT);     /* we need 1 args for this to work */
       }else{
-        sdext_SD_PyRunStr(SDMEArgArray[0]);
+        sdext_SD_PyRunFile(SDMEArgArray[0]);
       }
       break;
 

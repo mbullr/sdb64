@@ -21,11 +21,12 @@ $include keys.h
 
 deffun typetxt(inx) LOCAL
 
-crt 'embedded python test, hit <enter> to start':
-
+crt 'embedded python test, hit <enter> to start'
+rtn_stat = 0
 *input ok
 crt str('=',50)
 *
+
 crt 'attempt init'
 rtn_stat = PY_INITIALIZE()
 crt 'rtn_stat = ':rtn_stat
@@ -59,6 +60,7 @@ lf = char(10)
  *
  script := 'result = ""':lf
  script := 'alist = ["item 1", "item 2", "item 3", "item 4"]':lf
+ script := 'table = [["rw1c1", "rw1c2", "rw1c3"], ["rw2c1", "rw2c2", "rw2c3"],["rw3c1", "rw3c2", "rw3c3"] ]':lf
  script := 'countdown = {"3" : "Three", "2" : "Two", "1" : "One", "0" : "Ignition!"}':lf
  script := 'for count in countdown:':lf
  script := '  result += count + " " + countdown[count] + FMRK ':lf
@@ -80,7 +82,7 @@ crt 'attempt to run script:'
 rtn_stat = PY_RUNSTRING(script)
 crt 'rtn_stat = ':rtn_stat
 crt 'status()   = ':status()
-if rtn_stat <> 0 then goto 999
+*if rtn_stat <> 0 then goto 999
 crt str('=',50)
 *
 crt 'attempt to access python object: result'
@@ -361,6 +363,22 @@ crt 'call functions with invalid function name (nof)'
 rtn_str = PY_CALLFUNCTIONS('funcx','blist')
 crt  'status() = ':status()
 crt  'rtn_str  = ':rtn_str
+crt str('=',50)
+
+crt 'call tableget function'
+rtn_str = PY_GUITABLEGET('table')
+crt  'status() = ':status()
+crt  'rtn_str  = ':rtn_str
+crt str('=',50)
+
+crt 'call tableset function'
+newtable ='newr1data1':@svm:'newr1data2':@vm:'newr2data1':@svm:'newr2data2'
+rtn_st = PY_GUITABLESET('table',newtable)
+crt  'status() = ':status()
+crt  'rtn_str  = ':rtn_st
+crt 'display via PY_RUNSTRING'
+rtn_stat = PY_RUNSTRING("print(table)")
+
 crt str('=',50)
 *
 * don't finalize, we will check when sd closes
