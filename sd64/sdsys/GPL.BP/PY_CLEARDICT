@@ -1,6 +1,6 @@
 * PY_CLEARDICT
 * Clear Python Dictionary created for sd use
-* Copyright (c)2025 The SD Developers, All Rights Reserved
+* Copyright (c)2026 The SD Developers, All Rights Reserved
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@
 *
 * return_status = PY_CLEARDICT(dictname)
 *
-* dictname - name of python dictionary to create
+* dictname - name of python dictionary to clear
 * return_status 0 - success or error as defined in ERR.H
 *               status() - 0 on success, error code as defined in ERR.H
 *

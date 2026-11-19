@@ -1,0 +1,315 @@
+Python Interface Functions
+ PY_CALLFUNCTION
+ execute python function
+ rtn_stat = PY_CALLFUNCTION(function_name,result_name,arg1,arg2,arg3,arg4,arg5)
+
+ function_name - name of python function previously imported into interpreter (found in __main__ scope)
+ result_name - name of exiting python object to receive function results (found in __main__ scope)
+ arg1- arg5  - names of python objects previously created in interpreter (found in __main__ scope)
+                   status() - 0 on success, error code as defined in ERR.H
+                   rtn_stat - same
+
+PY_CALLFUNCTIONS
+ execute python function and return results as string
+ rtn_str = PY_CALLFUNCTIONS(function_name,arg1,arg2,arg3,arg4,arg5)
+
+ function_name - name of python function previously imported into interpreter (found in __main__ scope)
+ arg1- arg5  - names of python objects previously created in interpreter (found in __main__ scope)
+                   status() - 0 on success, error code as defined in ERR.H
+ rtn_str     - string returned from python function call
+
+PY_CLEARDICT
+ Clear Python Dictionary created for sd use
+ return_status = PY_CLEARDICT(dictname)
+
+ dictname - name of python dictionary to clear
+ return_status 0 - success or error as defined in ERR.H
+               status() - 0 on success, error code as defined in ERR.H
+
+PY_CREATEDICT
+ Create Python Dictionary for sd use
+ return_status = PY_CREATEDICT(dictname)
+
+ dictname - name of python dictionary to create
+ return_status 0 - success or error as defined in ERR.H
+               status() - 0 on success, error code as defined in ERR.H
+
+PY_DICTGETKEYS
+ Get Dictionary keys as string list
+ key_list = PY_DICTGETKEYS(dictname)
+
+ dictname - name of python dictionary to access
+ key_list - @fm separated list of dictionary keys
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_DICTGETVALUES
+ Get Dictionary values as string list
+ value_list = PY_DICTGETVALUES(dictname)
+
+ dictname - name of python dictionary to access
+ value_list - @fm separated list of dictionary values
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_DICTIDEL
+ Delete Python Dictionary Value for Key
+ returned_status = PY_DICTIDEL(dictname,key)
+
+ dictname - name of python dictionary to access
+ key      - dictionary key of item to delete
+ returned_status - 0 on success, error code as defined in ERR.H
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_DICTVALGETS
+ Get Python Dictionary Value for Key, return as string
+ returned_string = PY_DICTVALGETS(dictname,key)
+
+ dictname - name of python dictionary to access
+ key      - dictionary key to access
+ returned_string - on success returned string or empty string on failure
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_DICTVALSETS
+ Set Python Dictionary Value as string for Key
+ returned_status = PY_DICTVALSETS(dictname,key,value)
+
+ dictname - name of python dictionary to access
+ key      - dictionary key
+ value    - string to save in dictionary
+ returned_status - 0 on success, error code as defined in ERR.H
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_GETATTR
+ Return the (string) value of the  python object
+ return_string = PY_GETATTR(object_name)
+
+ object_name     - python object name
+ returned_string - on success returned string value of "object_name"
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_GUISTEP
+ Process one bounded Python GUI event step by executing the pre loaded python function gui_step.
+
+ rtn_status = PY_GUISTEP()
+
+PY_GUITABLEGET
+ get (read) Gui (FreeSimpleGUI) table list data
+ dyn_array = PY_GUITABLEGET(table_list_name)
+
+ table_list_name - object name of existing python list
+ dyn_array - dynamic array string containing the table data, example layout:
+              row 1 : col 1 data <svm> col 2 data <svm> col 3 data <vm>
+              row 2 : col 1 data <svm> col 2 data <svm> col 3 data <vm>
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_GUITABLESET
+ populate existing PYGUI FreeSimpleGUI table data from dyn array
+ returned_status = PY_GUITABLESET(table_list_name,dyn_array)
+
+ Note PY_GUITABLESET APPENDS the data in dyn_array to list table_list_name.
+      If you must clear table_list_name with PY_LISTCLR(table_list_name) before
+      calling PY_GUITABLESET if this is not the desired outcome.
+
+ object_name - object name of window created with  "window = sg.Window(....)
+ dyn_array - dynamic array string eg):
+              row 1 : col 1 data <svm> col 2 data <svm> col 3 data <vm>
+              row 2 : col 1 data <svm> col 2 data <svm> col 3 data <vm>
+ returned_status - 0 on success, error code as defined in ERR.H
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_GUIWINUPDATE
+ update PyGui (FreeSimpleGUI) Window's Gui Objects value parameter
+ eg) python script example:  window["CC_SELECT"].update(value=row_idx)
+ returned_status = PY_GUIWINUPDATE(object_name,key,value)
+
+ object_name - object name of window created with  "window = sg.Window(....)
+ key         - key to Gui Object we want to change
+ value       - data we want to set the objects text property to
+ returned_status - 0 on success, error code as defined in ERR.H
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_GUIWINUPDATES
+ update multi PyGui (FreeSimpleGUI) Window's Gui Objects value parameters
+ returned_status = PY_GUIWINUPDATE(object_name,key_list,value_list)
+
+ object_name - object name of window created with  "window = sg.Window(....)
+ key_list         - vm list of keys to Gui Object we want to change
+ value_list       - vm list of values we want to set the objects text property to
+ returned_status - 0 on success, error code as defined in ERR.H
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_GUIWINUPDVALUES
+ update PyGui Window's Gui Object's values parameter (objects that deal with lists, like tables and drop downs)
+  eg) python script example: window["CM_CONTACT"].update(values=CUST_CONTACTS)
+   where "CM_CONTACT" is the key to a table object and CUST_CONTACTS is a list of lists to set the CM_CONTACT's table data to
+ returned_status = PY_GUIWINUPDVALUES(object_name,key,list_name)
+
+ object_name - object name of window created with  "window = sg.Window(....)
+ key         - key to Gui Object we want to change
+ list_name   - name of python list object to update
+ returned_status - 0 on success, error code as defined in ERR.H
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_INITIALIZE
+ initialized the python interpreter
+ rtn_stat = PY_INITIALIZE()
+
+PY_IS_INITIALIZED()
+ Is python interpreter initialized
+ return_status = PY_IS_INITIALIZED()
+
+ return_status 1 - python interpreter initialized
+               0 - not initialized
+
+PY_LISTAPPD
+ Append object to List
+ rtn_stat = PY_LISTAPPD(listname,objname)
+
+ listname  - name of python list object to access
+ objname   - name of python object to append to listname
+ rtn_stat  - return status code
+                   status() - 0 on success, error code as defined in ERR.H
+                   
+PY_LISTAPPDS
+ Append vm string to python list object_name
+ rtn_stat = PY_LISTAPPDS(listname,dynlist)
+
+ listname  - name of python list to access
+ dynlist   - vm list to append to python list object listname
+ rtn_stat  - return status code
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_LISTCLR
+ Clear list object
+ rtn_stat = PY_LISTCLR(listname)
+
+ listname  - name of python list object to clear
+ rtn_stat  - return status code
+                   status() - 0 on success, error code as defined in ERR.H
+                   
+PY_LISTCRTE
+ Create new list object
+ rtn_stat = PY_LISTCRTE(listname)
+
+ listname  - name of python list to create
+ rtn_stat  - return status code
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_LISTGETS
+ Get List items as dynamic array
+ item_list = PY_LISTGETS(listname)
+
+ listname  - name of python list object to access
+ item_list - @fm separated list of list items
+                   status() - 0 on success, error code as defined in ERR.H
+
+PY_OBJLEN
+ Return the length of a python object (python len(object))
+ object_len = PY_OBJLEN(object)
+ 
+ object_name - name of python object to evaluate
+ object_len  - length of python object, meaning depends on object type (list = item count, string - character count...) 
+                   status() - 0 on success, error code as defined in ERR.H
+                   
+PY_OBJTYPE
+ Return python object type, defined in KEYS.H
+ object_type = PY_OBJTYPE(object)
+ 
+ object - name of python object to evaluate
+ object_type:
+  SD_Obj_Unkn         0  ;* Unknown python object type 
+  SD_Obj_Str          1  ;* String (Unicode) python object type 
+  SD_Obj_List         2  ;* List python object type 
+  SD_Obj_Dict         3  ;* Dictionary  python object type 
+  SD_Obj_Long         4  ;* Long (int)  python object type 
+  SD_Obj_Float        5  ;* Float (floating point)  python object type 
+  
+PY_POPUP
+ Display FreeSimpleGUI popup window
+ rtn_stat = PY_POPUP(function_name, popup_name, title_name, title_text, message_name, message_txt, style_name, style_setting)
+ 
+ function_name - name of python function which creates the window, defined in preloaded script 
+ title_name, message_name - name of exiting python object to receive associated text, then used to populate popup
+ title_text, message_text - text to display in popup
+ style_name style_setting  - one of (defined in SDPYFUNC.H):
+                    PY_PUP_OK      
+                    PY_PUP_YESNO   
+                    PY_PUP_OKCANCEL
+                    
+                   status() - 0 on success, error code as defined in ERR.H
+                   rtn_stat - same
+                   
+PY_PYPOLL
+ poll to see if the gui scheduled an event to process
+ EVENT = PY_PYPOLL()
+          EVENT NAME = FIELD(EVENT,@FM, 1)
+          EVENT DATA = FIELD(EVENT,@FM, 2)
+          status() - 0 on success, error code as defined in ERR.H
+          
+ use as part of the GUI event processing loop, eg)
+
+    loop while DONE = 0
+    
+      STATUS.VALUE = PY_PYGUISTEP()
+      if STATUS() # 0 then
+        crt "PyGUI step failed: ":STATUS()
+        DONE = 1
+      end else
+    *
+    *  now poll to see if the gui scheduled an event to process
+    *
+        EVENT = PY_PYPOLL()
+        if STATUS() = 0 then
+          EVENT.NAME = FIELD(EVENT,@FM, 1)
+          EVENT.DATA = FIELD(EVENT,@FM, 2)
+
+          * evaluate event
+          begin case
+          
+          case EVENT.NAME = "main_window" and EVENT.DATA = "closed" 
+            DONE = 1
+            exit      ;* get out of loop
+          
+          case  EVENT.NAME = some event 
+            process some event
+          .
+          .
+          .
+          case 1 ;* unknown event
+            unknow event handler
+          end case
+            
+        end     ;* poll failed, try again?
+      end
+    repeat
+    
+PY_RUNFILE
+ run a python script from a file
+ rtn_stat = PY_RUNFILE(script_file_name)
+ 
+ script_file_name - fully qualified file name of python script to execute
+                   status() - 0 on success, error code as defined in ERR.H
+                   rtn_stat - same 
+                   
+PY_RUNSTRING
+ run a python script from passed string
+ rtn_stat = PY_RUNSTRING(script_string)
+ 
+ script_string - python script string to execute
+                   status() - 0 on success, error code as defined in ERR.H
+                   rtn_stat - same
+PY_STRGET
+ Get String Value for string object strname, return as string
+ returned_string = PY_STRGET(strname)
+
+ strname  - name of python string object to access
+ returned_string - on success returned string or empty string on failure
+                   status() - 0 on success, error code as defined in ERR.H
+                   
+PY_STRSET
+ Set Python string object's value
+ returned_status = PY_STRSET(strname,value)
+
+ strname  - name of python string object to set
+ value    - string to save as string object
+ returned_status - 0 on success, error code as defined in ERR.H
+                   status() - 0 on success, error code as defined in ERR.H
